@@ -10,8 +10,8 @@ This exact minimal image has now passed the normal SATA write, startup, marker
 and full-readback trial on the retained specimen, as documented in
 [INQUIRY94_FLASH_TEST.md](INQUIRY94_FLASH_TEST.md). Native update-input checks
 also accept it offline in [LOADER_ACCEPTANCE.md](LOADER_ACCEPTANCE.md). Working-drive
-rollback from the patch, failure recovery and optical/media behavior remain
-unverified. This image does not implement the full OmniDrive hooks. The commands in
+rollback from the patch also passes with exact original readback. Optical/media
+behavior remains unverified. This image does not implement the full OmniDrive hooks. The commands in
 this offline build document invoke no flasher. The decoded image is distinct from
 the encrypted raw dump. Do not pass it to the existing
 MT1959 `update_cmac.py` script.
@@ -21,7 +21,8 @@ MT1959 `update_cmac.py` script.
 From the repository root, using the original decoded specimen:
 
 ```sh
-python3 tools/liteon/patch_firmware.py
+cmake -S . -B build -G Ninja
+cmake --build build --target ASUS_BW_12B1LT_1_03
 /tmp/liteon-research/bin/python tools/liteon/verify_inquiry_patch.py \
   firmware/ASUS_BW-12B1LT_1.03.bin \
   patched_firmware/ASUS_BW-12B1LT_1.03_OmniDrive-1.0.4.bin \
@@ -29,25 +30,33 @@ python3 tools/liteon/patch_firmware.py
 python3 -m unittest discover -s tests -v
 ```
 
-The generator requires Python's standard library and `armips` on `PATH`
+The build requires the normal project toolchain, Python and `armips` on `PATH`
 ([armips build instructions](https://github.com/Kingcom/armips#building)).
 It invokes armips on [ASUS_BW-12B1LT_1.03.asm](../../asm/ASUS_BW-12B1LT_1.03.asm)
-in a temporary directory, checks that only the intended instruction changed,
-then updates the LiteOn checksum in Python. The verifier also invokes this
-generator and therefore requires armips; it additionally uses the
-Capstone/Unicorn research environment described in [SCSI_MAP.md](SCSI_MAP.md).
-The generator rebuilds the versioned output and its JSON manifest in
-`patched_firmware/`; the verifier refuses an existing report destination.
-The generator pins the exact input
-SHA-256 and rejects raw dumps, other revisions and already patched images.
-It writes the image and a manifest with hashes, changed bytes and limitations.
+from the `asm` directory. The assembly checks the image size and original
+INQUIRY instruction, applies the patch and adjusts the stored LiteOn checksum
+by the changed word's delta. It produces only the versioned binary in
+`patched_firmware/`; no Python postprocessor or build JSON manifest is needed.
+
+The offline verifier rebuilds its reference image in a temporary directory using
+helpers in `audit_integrity.py`. These helpers pin the original SHA-256, verify
+that only the intended instruction and checksum changed, and independently check
+the final checksum. The verifier additionally uses the Capstone/Unicorn research
+environment described in [SCSI_MAP.md](SCSI_MAP.md) and refuses an existing report
+destination.
+
 The input is `firmware/ASUS_BW-12B1LT_1.03.bin`, a copy of the original decoded
 backup. Output naming follows the other profiles, using `asm/version.asm`:
 `patched_firmware/ASUS_BW-12B1LT_1.03_OmniDrive-1.0.4.bin`.
-CMake also builds this profile through the same Python/armips wrapper, using
-the LiteOn additive checksum instead of the other profiles' CMAC postprocessor.
+CMake invokes armips and `scripts/update_cmac.py` for every profile. The script
+recognizes the exact LiteOn INQUIRY-94 output by SHA-256 and leaves it unchanged;
+armips has already set its native checksum. Other images follow the MT1959 CMAC
+update path.
 With the normal ARM toolchain configured, the target is
 `cmake --build build --target ASUS_BW_12B1LT_1_03`.
+The historical CMake file does not track changes to firmware inputs or assembly
+sources. After changing these files, force regeneration with
+`cmake --build build --clean-first --target ASUS_BW_12B1LT_1_03`.
 
 The patch is `60 20` -> `5e 20` at file/execution address `0x9cb76`:
 Thumb `movs r0, #96` becomes `movs r0, #94`. The following native `strh` stores
@@ -100,7 +109,7 @@ an advertised total of 94. The expected data-in length is 94; transport residual
 reporting was checked on the retained specimen: the marker is `59` as predicted,
 while this Linux transport delivers 96 bytes with two padding bytes.
 
-See [RECOVERY.md](RECOVERY.md) for the offline integrity audit, native header
+See [INTEGRITY.md](INTEGRITY.md) for the offline integrity audit, native header
 selector trace, restoration acceptance criteria and future readback comparator.
 The generated image is a starting point for firmware modification. The
 hardware evidence includes the passed minimal patch trial and full readback in

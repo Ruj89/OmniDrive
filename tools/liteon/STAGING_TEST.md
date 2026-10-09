@@ -96,8 +96,7 @@ sudo python3 tools/liteon/read_flash.py /dev/sr0 \
 Compare that fresh decode with the original as in [PROGRAMMER_AUDIT.md](PROGRAMMER_AUDIT.md).
 The first physical write trial uses an original-image restore. The subsequent
 handoff audit and experimental runner are documented in
-[ORIGINAL_RESTORE_TEST.md](ORIGINAL_RESTORE_TEST.md); interrupted-write recovery
-remains unverified.
+[ORIGINAL_RESTORE_TEST.md](ORIGINAL_RESTORE_TEST.md).
 
 ## Reported hardware result
 

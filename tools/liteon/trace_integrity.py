@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Emulate integrity-record selection paths in the firmware within bounded offline runs.
 """Bounded offline execution of the specimen's integrity-record selector."""
 import argparse
 import hashlib
@@ -6,7 +7,7 @@ import json
 from pathlib import Path
 import sys
 
-from patch_firmware import build, IMAGE_SHA256
+from audit_integrity import build, IMAGE_SHA256
 
 
 def run(image, selector, synthetic=False):

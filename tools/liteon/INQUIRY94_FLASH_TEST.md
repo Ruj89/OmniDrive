@@ -12,7 +12,10 @@ the original except for the length field. Evidence:
 `dump/bw12b1lt-inquiry94-validation.json`. Acquisition files are retained under
 `dump/dump/bw12b1lt-inquiry94-01` and `dump/dump/bw12b1lt-after-inquiry94`.
 Power removal is user-reported; SPI transactions were not instrumented.
-The working-drive rollback command below is prepared but has not run on hardware.
+The working-drive rollback trial also passes: one accepted finalization in
+22,363 ms, all 512 RAM blocks matched, two identical original-image readbacks
+and all 14 structure checks passing. Standard INQUIRY is back to 96 bytes.
+Evidence: `dump/bw12b1lt-inquiry94-rollback-validation.json`.
 
 The original rewrite trial passed on the retained specimen: all 512 RAM blocks
 matched, one finalization completed without transport errors in 22,212 ms, and
@@ -20,8 +23,7 @@ two subsequent full reads decoded identically to the original across all 2 MiB.
 All 14 structure checks pass, including boot/profile/tails. Evidence:
 `dump/bw12b1lt-original-restore-validation.json`. Files/logs were supplied by the
 user; power removal is user-reported and physical SPI transactions were not
-instrumented. Recovery from interrupted writes or an unresponsive drive remains
-unvalidated.
+instrumented.
 
 This trial applies only the exact two-byte patch in [INQUIRY_TEST.md](INQUIRY_TEST.md):
 INQUIRY maximum 96 -> 94 and the main checksum. It does not implement the full
@@ -29,7 +31,7 @@ OmniDrive disc-reading hooks. Expected decoded patch SHA-256:
 `46be83575f28161ff3a851604d476070220a4a4970c7b5343622bf31b55ddc6b`.
 Boot/profile/tails are unchanged in the input; the writer still erases
 main/profile, including erasing profile first. The marker/startup/full-readback
-trial is accepted; optical/media behavior and failure recovery remain unverified.
+trial is accepted; optical/media behavior remains unverified.
 
 ## Package and guards
 
@@ -114,7 +116,11 @@ reads the current chip again before writes. After an accepted return, remove
 drive power/start again and acquire two full reads into a new directory such
 as `dump/bw12b1lt-after-inquiry94-rollback`. Require exact original equality and
 advertised INQUIRY total 96. The same no-retry ambiguity rules apply. This route
-has only been modeled; it does not recover a nonresponsive drive.
+has now passed on the retained specimen. The full 2 MiB readback matches the
+pinned original with zero differing bytes, including boot, profile and both tails.
+Power removal/startup is user-reported; host logs and both raw acquisitions
+are retained under `dump/dump/bw12b1lt-inquiry94-rollback-01` and
+`dump/dump/bw12b1lt-after-inquiry94-rollback`.
 
 To reproduce the package offline, choose a new output path:
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Decode saved Lite-On flash reads into a firmware image using captured INQUIRY data.
 """Decode a saved Lite-On raw flash stream offline; never accesses a drive."""
 import argparse
 import hashlib

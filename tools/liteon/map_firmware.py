@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Map firmware signatures, functions, and references for offline reverse engineering.
 """Reproducible, offline reconnaissance of the known BW-12B1LT image.
 
 Signature matches and linear-sweep references are leads, not patch addresses.

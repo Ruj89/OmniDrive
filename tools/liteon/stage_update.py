@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Prepare a pinned update package and optionally stage it in drive RAM for validation.
 """Prepare or test the pinned BW-12B1LT original update in staging RAM only.
 
 The Linux transport excludes finalization (80/a0), erase, reset and unlock.
@@ -12,7 +13,7 @@ from pathlib import Path
 import sys
 
 from read_flash import SgDevice, SgIoHdr, SG_IO, ReadError, probe
-from patch_firmware import IMAGE_SHA256
+from audit_integrity import IMAGE_SHA256
 from analyze_utility import EXPECTED_SHA256
 
 SIZE = 0x200000

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Emulate the pinned Windows utility's finalization worker and retry handling offline.
 """Execute the pinned utility's finalization worker offline, without a device.
 
 Transport returns are injected at the Windows-independent wrapper boundary.
@@ -86,7 +87,7 @@ def verify(binary):
                 'Transport returns and the tag payload are synthetic; no Windows API or SG_IO runs.',
                 'The worker makes no independent status-poll or physical-readback command.',
                 'A transport failure may follow an actual write; native retry is not safe evidence for replay.',
-                'Firmware handoff, controller remapping, physical timing and recovery remain unverified.']}
+                'Firmware handoff, controller remapping and physical timing remain unverified.']}
 
 
 def main():

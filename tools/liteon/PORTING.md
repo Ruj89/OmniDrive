@@ -46,7 +46,7 @@ does not demonstrate that the corresponding function or capability is absent.
 | Command dispatcher | Thumb `0x1b14e`: comparisons and inline halfword jump tables; key opcode/media routes emulated | Mapped in [SCSI_MAP.md](SCSI_MAP.md); original chained-table insertion does not apply |
 | Read / error / sense functions | Read handlers, parameter RAM, FUA calls, INQUIRY data-in setup and REQUEST SENSE mapped in the SCSI follow-up | Original instructions exercised with explicit synthetic dependencies; optical behavior unresolved |
 | Payload space | Uniform runs in main area catalogued | Contents alone do not establish free space |
-| Integrity / flashing | Native header selection in [RECOVERY.md](RECOVERY.md); update-input checks and writer handoff in [LOADER_ACCEPTANCE.md](LOADER_ACCEPTANCE.md) | Software acceptance verified in emulation; physical write, restore and preservation unverified |
+| Integrity / flashing | Native header selection in [INTEGRITY.md](INTEGRITY.md); update-input checks and writer handoff in [LOADER_ACCEPTANCE.md](LOADER_ACCEPTANCE.md) | Software acceptance verified in emulation; physical write, restore and preservation unverified |
 
 Linear-sweep call and literal references in the report may include data decoded
 as instructions. They are navigation aids, not a verified call graph. Selected
@@ -85,7 +85,7 @@ At `0x10400`, 28-byte records resemble those consumed by
 | `0x10470` | `00000000` | `0x10400`–`0x1046f` | All `ff` |
 
 The native selector's termination and flag matching are now traced in
-[RECOVERY.md](RECOVERY.md): the first `ffffffff` record terminates the observed
+[INTEGRITY.md](INTEGRITY.md): the first `ffffffff` record terminates the observed
 scan, and the startup selector is `1`. This does not establish loader checks
 or the hardware tag algorithm. The original script treats every flag except
 `ffffffff` as enabled, including the out-of-image range. **Do not apply

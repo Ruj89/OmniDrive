@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Verify original and patched firmware update-input checks by running native code offline.
 """Verify firmware update input gates offline with original ARM and x86 code.
 
 No devices or Windows APIs. AES MMIO, DMA and peripheral preparation are modeled;
@@ -11,7 +12,7 @@ from pathlib import Path
 import struct
 import sys
 
-from patch_firmware import build, IMAGE_SHA256
+from audit_integrity import build, IMAGE_SHA256
 from analyze_utility import EXPECTED_SHA256
 
 
@@ -493,7 +494,7 @@ def verify(original, experimental, inquiry, binary):
             'flash_ready': False, 'hardware_tested': False,
             'limits': ['Stops at 0x1baeb4 before hardware preparation and imported flash-programmer execution.',
                        'Separate programmer runs use ready serial/controller responses and stop before first erase; controller remapping is not emulated.',
-                       'Does not establish physical SATA transport, erase/write completion or recovery.',
+                       'Does not establish physical SATA transport or erase/write completion.',
                        'Captured INQUIRY does not establish the physical chip complete JEDEC ID or protection state.',
                        'Applies only to the pinned specimen and the modeled Flash Utility protocol.']}
 

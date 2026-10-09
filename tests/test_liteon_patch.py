@@ -2,11 +2,13 @@ import importlib.util
 import hashlib
 from pathlib import Path
 import struct
+import sys
 import unittest
 from unittest.mock import patch as mock_patch
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("patch_firmware", ROOT / "tools/liteon/patch_firmware.py")
+sys.path.insert(0, str(ROOT / "tools/liteon"))
+spec = importlib.util.spec_from_file_location("audit_integrity", ROOT / "tools/liteon/audit_integrity.py")
 patch = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patch)
 

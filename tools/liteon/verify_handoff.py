@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
+# Purpose: Emulate firmware update validation, writer handoff, and handler return offline.
 """Offline native update gate -> handoff -> imported writer -> handler return.
 
 Peripheral completion and SPI NOR are modeled. The native code-copy loop runs;
 its controller-selected executable view is applied at an explicit model boundary.
-No device is opened and no physical recovery or timing is established.
+No device is opened and no physical timing is established.
 """
 import argparse
 import json
@@ -13,7 +14,7 @@ import sys
 
 from verify_loader import ReaderGates, Utility, IMAGE_SHA256, build, require, sha, validate_inquiry
 from verify_programmer import Nor, PROGRAMMER_SHA256
-from audit_recovery import REGIONS
+from audit_integrity import REGIONS
 from stage_update import transfer_image
 
 
@@ -174,7 +175,7 @@ def verify(original, experimental, inquiry, binary):
                        'Native 7164-byte programmer copy executes; its checked executable mapping is applied at 0x1baf22.',
                        'Controller ready/completed responses and SPI NOR use synthetic compatible JEDEC IDs.',
                        'First-4-KiB RAM/SPI buffers are flat views; physical alias ownership and timing are not established.'],
-            'limits': ['No real SATA transport, flash chip protection, electrical timing or interrupted-write recovery.',
+            'limits': ['No real SATA transport, flash chip protection or electrical timing.',
                        'Handler return with clear input-error flags also occurs after a persistent write failure.',
                        'Full cold-start flash readback is required to validate any physical write.']}
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Emulate the pinned flash programmer and audit its erase and program operations.
 """Audit the pinned imported flash programmer offline, through its native return.
 
 Unicorn executes the original Thumb code. SPI/controller responses and a NOR
@@ -12,7 +13,7 @@ from pathlib import Path
 import struct
 import sys
 
-from audit_recovery import REGIONS
+from audit_integrity import REGIONS
 from verify_loader import Utility, IMAGE_SHA256, build, require, sha, validate_inquiry
 
 FLASH_SIZE = 0x200000
@@ -241,8 +242,8 @@ def verify(original, experimental, inquiry, binary):
                        'Peripheral command port 0x4010000 is not interpreted; its busy bit is modeled ready.',
                        'Staging/controller bases initialized separately from the firmware handoff.'],
             'limits': ['Separate entry execution does not prove controller remapping or handoff continuity.',
-                       'No physical chip identity, protection/timing behavior, EEPROM/OTP preservation or recovery evidence.',
-                       'Interrupted cases show in-memory damage only; no recovery path is executed.',
+                       'No physical chip identity, protection/timing behavior or EEPROM/OTP preservation evidence.',
+                       'Interrupted cases show in-memory damage only.',
                        'Native return alone is insufficient: the persistent dropped-page case returns with damaged data.']}
 
 

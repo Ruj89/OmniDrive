@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+# Purpose: Prepare and run the pinned INQUIRY-94 patch or original-firmware rollback trial.
 """Pinned BW-12B1LT INQUIRY-94 physical trial and working-drive rollback.
 
 apply: known original -> exact two-byte INQUIRY-94 patch.
 rollback: verified INQUIRY-94 patch -> known original.
 Both use the once-only, boot-skipping finalization from restore_original.
-No arbitrary images, unknown source flash or nonresponsive-drive recovery.
+No arbitrary images or unknown source flash.
 """
 import argparse
 import hashlib
@@ -29,7 +30,7 @@ MANIFEST = {'format': 'bw12b1lt-inquiry94-trial-v1',
             'finalization_cdb_hex': restore.FINAL_CDB.hex(), 'boot_update': False,
             'finalization_max_attempts': 1, 'finalization_timeout_ms': restore.FINAL_TIMEOUT_MS,
             'expected_patch_inquiry_length': 94, 'full_omnidrive_hooks': False,
-            'patch_hardware_validated': False, 'nonresponsive_recovery_validated': False, 'flash_ready': False}
+            'patch_hardware_validated': False, 'flash_ready': False}
 
 
 def check_payloads(profile, staged, tag, direction):
@@ -55,7 +56,7 @@ def check_baseline(directory, direction):
 
 
 def prepare(original_package, original_path, patched_path, baseline, output):
-    from patch_firmware import build
+    from audit_integrity import build
     from Crypto.Cipher import AES
     require(not output.exists(), 'Trial package directory already exists')
     profile, original_staged, tag, unused_manifest = restore.load_package(original_package)

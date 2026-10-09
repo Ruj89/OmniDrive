@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Read and save flash data from a compatible Lite-On drive over Linux SG_IO.
 """Experimental Linux Lite-On flash reader. No data-out or write commands."""
 import argparse
 import ctypes as C

@@ -1,5 +1,8 @@
 import argparse
+import hashlib
+from pathlib import Path
 import struct
+import sys
 
 from Crypto.Hash import CMAC
 from Crypto.Cipher import AES
@@ -11,6 +14,13 @@ cmac_range_size = struct.calcsize(cmac_range_fmt)
 parser = argparse.ArgumentParser()
 parser.add_argument("firmware_file")
 args = parser.parse_args()
+
+# This exact LiteOn INQUIRY-94 image already has its native checksum set by
+# armips. Its header must not be interpreted as an MT1959 CMAC table.
+LITEON_INQUIRY94_SHA256 = '46be83575f28161ff3a851604d476070220a4a4970c7b5343622bf31b55ddc6b'
+if hashlib.sha256(Path(args.firmware_file).read_bytes()).hexdigest() == LITEON_INQUIRY94_SHA256:
+    print('LiteOn INQUIRY-94 image: native checksum already set; skipping MT1959 CMAC')
+    sys.exit(0)
 
 def calc_cmac(cmac_struct):
     enabled, start, end, original_cmac = struct.unpack(cmac_range_fmt, cmac_struct)

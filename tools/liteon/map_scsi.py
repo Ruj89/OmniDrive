@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Trace SCSI command handling in the pinned firmware using bounded emulation.
 """Offline SCSI dispatch map for the exact BW-12B1LT 1.03 specimen.
 
 Executes original instructions in synthetic RAM/MMIO. Calls outside each

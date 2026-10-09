@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Extract and inspect read-command behavior from the pinned Windows flash utility.
 """Offline extraction of read CDBs from one known Flash Utility binary.
 
 Optional research dependencies: pefile, unicorn. Never invokes Windows APIs.

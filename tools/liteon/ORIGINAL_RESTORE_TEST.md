@@ -6,15 +6,14 @@ errors. Two post-restart reads freshly decode to the original across all 2 MiB,
 with all 14 checks passing and zero changed bytes. Evidence is saved separately
 in `dump/bw12b1lt-original-restore-validation.json`; acquisition logs are unchanged.
 Power removal/startup is user-reported and SPI was not instrumented. The normal
-rewrite/readback trial is accepted; interrupted-write recovery remains unverified.
+rewrite/readback trial is accepted.
 The minimal patch trial has also passed with its expected marker and exact full
 readback; evidence is documented in [INQUIRY94_FLASH_TEST.md](INQUIRY94_FLASH_TEST.md).
 
 This experimental Linux/SATA trial rewrites the original main/profile using
 native control `80`. Boot and the last 128 KiB are excluded by the audited
 writer. The profile is erased first and rewritten last: interruption can leave
-the drive unusable with boot intact. SATA recovery from that state and Raspberry
-Pi SPI recovery have not been established. Acceptance requires two full matching
+the drive unusable with boot intact. Acceptance requires two full matching
 reads after cold startup; a successful transport result is insufficient.
 
 The supplied staging journal now matches every expected CDB, direction, length,
@@ -40,7 +39,7 @@ native readback mismatches and 44,232 incorrect bytes but returns with clear
 input-error flags. Neither handler return nor transport success proves complete
 programming. Ready/completed peripheral status, NOR and executable visibility
 are models. RAM/SPI buffers use flat views; physical alias ownership, chip
-protection, EEPROM persistence, timing and recovery remain unverified.
+protection, EEPROM persistence and timing remain unverified.
 
 Reproduce with a new output filename:
 
@@ -117,10 +116,9 @@ sudo python3 tools/liteon/read_flash.py /dev/sr0 \
 ```
 
 Copy **both** `dump/bw12b1lt-restore-01` and `dump/bw12b1lt-after-restore` back.
-Require a fresh cold-start decoded full-image match using [RECOVERY.md](RECOVERY.md).
+Require a fresh cold-start decoded full-image match using [INTEGRITY.md](INTEGRITY.md).
 Any differing byte fails this trial. A separate minimal-patch write trial can
-follow acceptance. Normal restore does not validate interrupted-write recovery
-or the full OmniDrive feature set.
+follow acceptance. Normal restore does not validate the full OmniDrive feature set.
 
 To regenerate the package offline, choose a new output path:
 

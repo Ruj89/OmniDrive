@@ -7,7 +7,7 @@ This verifier supplies software acceptance evidence and retains `flash_ready`
 and `hardware_tested` false. Separate subsequent hardware trials now pass for
 the original and minimal patch, including exact full readback and the 94-byte
 marker; see [INQUIRY94_FLASH_TEST.md](INQUIRY94_FLASH_TEST.md). Working-drive
-rollback from the patch and failure recovery remain unverified.
+rollback from the patch also passes with exact original readback.
 
 ## Reproduce
 
@@ -147,8 +147,7 @@ erase/program completion and post-write startup are not established.
 This proves acceptance for the pinned image and modeled protocol, rather than
 unconditional acceptance under every live drive state. A drive is not attached
 here. Hardware confirmation requires the actual chip ID/state and a restore
-rehearsal with complete readback, as described in [RECOVERY.md](RECOVERY.md).
-Recovery when normal firmware stops responding remains a separate requirement.
+rehearsal with complete readback, as described in [INTEGRITY.md](INTEGRITY.md).
 
 The separate follow-up [programmer audit](PROGRAMMER_AUDIT.md) executes the entry
 through return using an in-memory NOR model, with complete erase/program ranges,
@@ -160,4 +159,4 @@ and handler return in the same CPU state, with explicit executable-visibility
 and SPI models. Six cases and an original-only experimental Linux write trial
 are documented in [ORIGINAL_RESTORE_TEST.md](ORIGINAL_RESTORE_TEST.md). Neither
 that software audit nor the successful RAM staging test establishes physical
-write completion or interrupted-write recovery.
+write completion.

@@ -154,8 +154,8 @@ are inferred from their contents; the precise preservation policy for a
 restoration flasher remains unverified.
 
 `offline_structure_consistent: true` means the file is coherent for analysis.
-`flash_ready` remains false because a restore procedure, drive-specific region
-handling and physical write/recovery have not been validated. The native main
+`flash_ready` remains false in this structure-only report; hardware write and
+drive-specific region checks are recorded in separate trial reports. The native main
 checksum and update-input gates are traced in [LOADER_ACCEPTANCE.md](LOADER_ACCEPTANCE.md).
 Validation never repairs checksums, modifies a file, or contacts the drive.
 
@@ -184,9 +184,9 @@ armips assembly patch (with Python input checks and LiteOn checksum update)
 and 20 bounded original/modified emulation runs. It produces an
 experimental image and change manifest, not a validated flashing file.
 
-[RECOVERY.md](RECOVERY.md) adds a fresh integrity audit, 12 bounded integrity
+[INTEGRITY.md](INTEGRITY.md) adds a fresh integrity audit, 12 bounded integrity
 selector experiments and a strict comparator for future restored readbacks.
-The write protocol and failure recovery remain unvalidated on hardware.
+The original and minimal-patch write/readback trials are documented separately below.
 
 [LOADER_ACCEPTANCE.md](LOADER_ACCEPTANCE.md) documents native update-input
 acceptance for both original and OmniDrive, corruption rejection, utility
@@ -200,7 +200,7 @@ through its native return with an in-memory NOR array: erase/program coverage,
 native retries and interruption damage across 13 scenarios. It also documents
 the fresh baseline to collect on Linux via SATA. The profile is erased during
 initialization even with boot excluded. The subsequent original rewrite trial
-now passes on the retained specimen; interrupted-write recovery remains unverified.
+now passes on the retained specimen.
 
 [STAGING_TEST.md](STAGING_TEST.md) provides an original-image RAM transfer test
 for Linux via SATA. Preparation checks the fresh baseline and derives a pinned
@@ -215,5 +215,5 @@ minimal patch write/marker/full-readback trial now passes as well, with exactly
 two expected changed bytes and advertised INQUIRY total 94 (96-byte received
 buffer including two padding bytes). Evidence and the prepared working-drive
 rollback path are documented in [INQUIRY94_FLASH_TEST.md](INQUIRY94_FLASH_TEST.md).
-Working-drive rollback from the patch, optical/media behavior and interrupted-write
-recovery remain unvalidated.
+Working-drive rollback from the patch also passes with exact original readback.
+Optical/media behavior remains unvalidated.

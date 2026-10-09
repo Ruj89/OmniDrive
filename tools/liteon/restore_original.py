@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Prepare and execute the pinned original-firmware rewrite on the target drive.
 """Experimental Linux physical rewrite of the pinned BW-12B1LT original only.
 
 This trial preserves boot in the native mode-80 writer, but erases main/profile.

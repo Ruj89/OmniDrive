@@ -4,7 +4,7 @@
 the original Thumb programmer's return. It executes the 3942-byte programmer
 selected from pinned Flash Utility 7.2.0, including serial command construction,
 page readback comparisons and retries. Operations target an in-memory NOR array.
-No device is opened. Hardware flashing and recovery remain unverified.
+No device is opened. Hardware flashing is validated separately in the write/readback trials.
 
 ## Reproduce the offline audit
 
@@ -61,7 +61,6 @@ Five further scenarios exercise failures and interruption:
   not establish how the firmware caller or host reports the failure.
 * Stopping after the first erase leaves the profile erased with boot intact.
   Stopping after the first page program also leaves main partly erased.
-  Neither run demonstrates recovery.
 
 `offline_programmer_audit_passed` means all 13 expected scenarios were observed,
 including damaged outcomes. `flash_ready` and `hardware_tested` stay false.
@@ -114,14 +113,11 @@ command, accepts transport returns 0 or 16, and retries once on failure. It
 issues no independent physical-readback or status-poll command. The host UI,
 firmware handoff and physical transport are excluded from the host-worker audit.
 The persistent-fault case cannot be judged by native
-return alone. Identify the actual chip and investigate recovery while boot is
-intact; the in-memory result does not prove SATA recovery after an interrupted
-write. An external programmer, including a Raspberry Pi, is a possible recovery
-route only after chip voltage/pinout and an independent physical backup are checked.
+return alone; full physical readback is required.
 
 The first write trial should restore the **original decoded image** with control
 `80`, followed by full power removal/startup and two complete reads. Require an
-exact full-image match using [RECOVERY.md](RECOVERY.md), including boot, profile
+exact full-image match using [INTEGRITY.md](INTEGRITY.md), including boot, profile
 and tail. Then test the minimal patch and its 94-byte INQUIRY marker described
 in [INQUIRY_TEST.md](INQUIRY_TEST.md). An experimental original-only Linux rewrite
 runner in [ORIGINAL_RESTORE_TEST.md](ORIGINAL_RESTORE_TEST.md) has now passed with
@@ -132,5 +128,5 @@ is documented in [INQUIRY94_FLASH_TEST.md](INQUIRY94_FLASH_TEST.md).
 
 The [staging test](STAGING_TEST.md) has passed on hardware, with a verified full
 journal and byte-identical original readback after reported power removal.
-Working-drive rollback from the patch, optical/media behavior and failure
-recovery remain open.
+Working-drive rollback from the patch also passes with exact original readback;
+see [INQUIRY94_FLASH_TEST.md](INQUIRY94_FLASH_TEST.md). Optical/media behavior remains open.

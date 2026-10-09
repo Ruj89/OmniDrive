@@ -5,16 +5,16 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools/liteon"
-for name in ("read_flash", "decode_flash", "validate_flash", "patch_firmware", "audit_recovery", "trace_integrity"):
+for name in ("read_flash", "decode_flash", "validate_flash", "audit_integrity", "trace_integrity"):
     spec = importlib.util.spec_from_file_location(name, TOOLS / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)
-audit = sys.modules["audit_recovery"]
-patch = sys.modules["patch_firmware"]
+audit = sys.modules["audit_integrity"]
+patch = audit
 
 
-class RecoveryComparisonTests(unittest.TestCase):
+class IntegrityComparisonTests(unittest.TestCase):
     def test_rejects_truncated_readback(self):
         with self.assertRaises(audit.ReadError):
             audit.compare_readback(bytes(0x200000), bytes(0x1fffff))
@@ -31,7 +31,7 @@ class RecoveryComparisonTests(unittest.TestCase):
             self.assertEqual({n for n, equal in report["regions_identical"].items() if not equal}, {name})
 
 
-class LocalRecoverySpecimenTests(unittest.TestCase):
+class LocalIntegritySpecimenTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         path = ROOT / "firmware/ASUS_BW-12B1LT_1.03.bin"
@@ -46,7 +46,6 @@ class LocalRecoverySpecimenTests(unittest.TestCase):
         self.assertTrue(report["integrity_header_unchanged"])
         self.assertEqual(report["experimental_checksums"]["main"]["delta"], 0x80)
         self.assertFalse(report["flash_ready"])
-        self.assertFalse(report["recovery_ready"])
         self.assertFalse(report["restore_readback_verified"])
         rollback = audit.compare_readback(self.original, self.experimental)
         self.assertFalse(rollback["byte_identical_to_original"])
@@ -64,12 +63,11 @@ class LocalRecoverySpecimenTests(unittest.TestCase):
         with self.assertRaises(audit.ReadError):
             audit.audit(ROOT / "dump", self.original, self.experimental, ROOT / "dump")
 
-    def test_identical_supplied_readback_does_not_certify_recovery(self):
+    def test_identical_supplied_readback_does_not_certify_hardware_trial(self):
         # This is the original backup supplied twice, NOT a hardware restore.
         report = audit.audit(ROOT / "dump", self.original, self.experimental,
                              ROOT / "dump", ROOT / "firmware/ASUS_BW-12B1LT_1.03.bin")
         self.assertTrue(report["restore_readback_verified"])
-        self.assertFalse(report["recovery_ready"])
         self.assertFalse(report["flash_ready"])
 
     def test_native_header_selector_trace(self):

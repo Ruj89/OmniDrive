@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Compare original and patched INQUIRY behavior through bounded firmware emulation.
 """Compare original and patched INQUIRY instructions in bounded emulation."""
 import argparse
 import json
@@ -6,7 +7,7 @@ from pathlib import Path
 import sys
 
 from map_scsi import CDB, Experiment, require
-from patch_firmware import build
+from audit_integrity import build
 
 
 def exercise(image, allocation, field=None):

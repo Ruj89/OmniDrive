@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Purpose: Check decoded flash structure, checksums, partition layout, and read consistency.
 """Validate a decoded dump offline, without changing images or accessing SATA."""
 import argparse
 import hashlib
