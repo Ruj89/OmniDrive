@@ -1,5 +1,4 @@
 import argparse
-import hashlib
 from pathlib import Path
 import struct
 import sys
@@ -15,11 +14,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("firmware_file")
 args = parser.parse_args()
 
-# This exact LiteOn INQUIRY-94 image already has its native checksum set by
-# armips. Its header must not be interpreted as an MT1959 CMAC table.
-LITEON_INQUIRY94_SHA256 = '46be83575f28161ff3a851604d476070220a4a4970c7b5343622bf31b55ddc6b'
-if hashlib.sha256(Path(args.firmware_file).read_bytes()).hexdigest() == LITEON_INQUIRY94_SHA256:
-    print('LiteOn INQUIRY-94 image: native checksum already set; skipping MT1959 CMAC')
+# MT1939 uses a native word sum; preserve the historical CMAC path otherwise.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools/liteon/patch_build'))
+from finalize_native import finalize_if_native
+if finalize_if_native(args.firmware_file):
     sys.exit(0)
 
 def calc_cmac(cmac_struct):

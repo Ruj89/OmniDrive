@@ -30,3 +30,4 @@ foreach(firmware_file ${firmware_list})
             DEPENDS "${CMAKE_SOURCE_DIR}/patched_firmware/${patched_firmware_name}"
     )
 endforeach()
+include(cmake/mt1939.cmake)

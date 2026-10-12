@@ -1,5 +1,27 @@
 # Experimental Linux Lite-On flash reading
 
+For the full MT1939 OmniDrive candidate, use the dedicated
+[apply, full readback and rollback procedure](docs/NATIVE_FLASH_TEST.md).
+The original-only and minimal INQUIRY-94 trial tools do not accept that candidate.
+
+## Layout
+
+Each folder has a README describing its files. Run every command from the
+repository root.
+
+| Folder | Content |
+| --- | --- |
+| [device/](device/README.md) | Tools that talk to a physical drive over SG_IO: flash reader, RAM staging and the flash/rollback trials |
+| [dump_analysis/](dump_analysis/README.md) | Offline decoding, validation and integrity audit of saved flash reads |
+| [reverse_engineering/](reverse_engineering/README.md) | Maps and bounded emulation of the original firmware and the Windows Flash Utility |
+| [update_emulation/](update_emulation/README.md) | Offline emulation of the native update chain: loader gates, finalization, handoff, NOR programmer |
+| [patch_build/](patch_build/README.md) | Isolated build of the MT1939 OmniDrive image and native checksum finalization |
+| [patch_verify/](patch_verify/README.md) | Emulated verification of the built patches and the evidence report for physical trials |
+| [docs/](docs/README.md) | Research notes and physical test procedures |
+
+Tools import each other by module name across folders; `liteon_paths.py` puts
+every folder on `sys.path`, and each script loads it at startup.
+
 Target: ASUS BW-12B1LT firmware 1.03, connected via SATA. This is a research
 tool. A user supplied two matching raw dumps and an INQUIRY report from one
 specimen; the offline decoder recovered recognizable firmware from them.
@@ -13,7 +35,7 @@ Python 3 and the Linux SCSI generic interface are sufficient; no Python packages
 are required for the reader. From the OmniDrive repository root:
 
 ```sh
-sudo python3 tools/liteon/read_flash.py /dev/sr0 --output /tmp/bw12b1lt-probe
+sudo python3 tools/liteon/device/read_flash.py /dev/sr0 --output /tmp/bw12b1lt-probe
 cat /tmp/bw12b1lt-probe/report.json
 ```
 
@@ -29,7 +51,7 @@ identify it with `lsscsi -g`). Permission and ioctl failures are reported.
 Once the probe's metadata has been reviewed:
 
 ```sh
-sudo python3 tools/liteon/read_flash.py /dev/sr0 --dump --output /tmp/bw12b1lt-dump
+sudo python3 tools/liteon/device/read_flash.py /dev/sr0 --dump --output /tmp/bw12b1lt-dump
 ```
 
 This reads the reported size twice in 128-byte blocks, writing
@@ -88,7 +110,7 @@ It refuses binaries with any other SHA-256.
 ```sh
 python3 -m venv /tmp/liteon-research
 /tmp/liteon-research/bin/pip install pefile unicorn
-/tmp/liteon-research/bin/python tools/liteon/analyze_utility.py /path/to/Flash_Utility.exe
+/tmp/liteon-research/bin/python tools/liteon/reverse_engineering/analyze_utility.py /path/to/Flash_Utility.exe
 python3 -m unittest discover -s tests -v
 ```
 
@@ -109,7 +131,7 @@ Install `pycryptodome` in the research environment, then run:
 
 ```sh
 /tmp/liteon-research/bin/pip install pycryptodome
-/tmp/liteon-research/bin/python tools/liteon/decode_flash.py \
+/tmp/liteon-research/bin/python tools/liteon/dump_analysis/decode_flash.py \
   /tmp/bw12b1lt-dump/flash1.raw.bin /tmp/bw12b1lt-dump/report.json \
   --output firmware/ASUS_BW-12B1LT_1.03.bin
 ```
@@ -122,7 +144,7 @@ checksums, and any drive-specific regions required by a flasher.
 ## Offline validation
 
 ```sh
-/tmp/liteon-research/bin/python tools/liteon/validate_flash.py \
+/tmp/liteon-research/bin/python tools/liteon/dump_analysis/validate_flash.py \
   /tmp/bw12b1lt-dump --image firmware/ASUS_BW-12B1LT_1.03.bin \
   --output /tmp/bw12b1lt-dump/validation-report.json
 ```
@@ -136,7 +158,7 @@ The main region's stored value exceeds that full-region sum by `0x80`; an
 independently downloaded iHBS112 2 PL06 reference has the same delta. For the
 ASUS specimen, native update instructions now establish the sum endpoint as
 `0x1cfdf8`, excluding 512 `ff` bytes before storage at `0x1cfff8`. See
-[LOADER_ACCEPTANCE.md](LOADER_ACCEPTANCE.md) for native acceptance evidence.
+[LOADER_ACCEPTANCE.md](docs/LOADER_ACCEPTANCE.md) for native acceptance evidence.
 
 The reference at
 `https://cheapiesystems.com/media/odd-firmware/PLDS/stockfw/iHBS112%202/PL06.BIN`
@@ -156,7 +178,7 @@ restoration flasher remains unverified.
 `offline_structure_consistent: true` means the file is coherent for analysis.
 `flash_ready` remains false in this structure-only report; hardware write and
 drive-specific region checks are recorded in separate trial reports. The native main
-checksum and update-input gates are traced in [LOADER_ACCEPTANCE.md](LOADER_ACCEPTANCE.md).
+checksum and update-input gates are traced in [LOADER_ACCEPTANCE.md](docs/LOADER_ACCEPTANCE.md).
 Validation never repairs checksums, modifies a file, or contacts the drive.
 
 The captured vectors in `tests/liteon_read_vectors.json` are independent of the
@@ -168,52 +190,62 @@ validation.
 
 ## MT1939 porting study
 
-See [PORTING.md](PORTING.md) for the reproducible offline function map,
+See [PORTING.md](docs/PORTING.md) for the reproducible offline function map,
 small-function emulation, integrity-header observations and remaining ABI work.
-The follow-up [SCSI_MAP.md](SCSI_MAP.md) maps command reception, dispatch,
+The follow-up [SCSI_MAP.md](docs/SCSI_MAP.md) maps command reception, dispatch,
 read parameters/FUA, data-in setup and sense responses, with reproducible
-bounded emulation in `map_scsi.py`.
-The MT1939 profile is included in the build with its current minimal patch;
-hardware flashing remains unvalidated.
+bounded emulation in `reverse_engineering/map_scsi.py`.
+The MT1939 profile now builds the experimental native adapter described below.
+Historical physical trials cover only the separate minimal patch.
 
 ## First minimal modification
 
-[INQUIRY_TEST.md](INQUIRY_TEST.md) documents a specimen-specific offline patch
+[INQUIRY_TEST.md](docs/INQUIRY_TEST.md) documents a specimen-specific offline patch
 that changes the standard INQUIRY response limit from 96 to 94 bytes, its
 armips assembly patch (with Python input checks and LiteOn checksum update)
 and 20 bounded original/modified emulation runs. It produces an
 experimental image and change manifest, not a validated flashing file.
 
-[INTEGRITY.md](INTEGRITY.md) adds a fresh integrity audit, 12 bounded integrity
+[INTEGRITY.md](docs/INTEGRITY.md) adds a fresh integrity audit, 12 bounded integrity
 selector experiments and a strict comparator for future restored readbacks.
 The original and minimal-patch write/readback trials are documented separately below.
 
-[LOADER_ACCEPTANCE.md](LOADER_ACCEPTANCE.md) documents native update-input
+[LOADER_ACCEPTANCE.md](docs/LOADER_ACCEPTANCE.md) documents native update-input
 acceptance for both original and OmniDrive, corruption rejection, utility
 encoding/CDB verification and a separate programmer-entry trace to the first
 erase boundary. These are offline proofs with explicit hardware models.
 The verifier now includes each block's native READ BUFFER and x86 byte comparison,
 readback failure/short-transfer/mismatch aborts, and pinned INQUIRY metadata.
 
-[PROGRAMMER_AUDIT.md](PROGRAMMER_AUDIT.md) extends the separate programmer run
+[PROGRAMMER_AUDIT.md](docs/PROGRAMMER_AUDIT.md) extends the separate programmer run
 through its native return with an in-memory NOR array: erase/program coverage,
 native retries and interruption damage across 13 scenarios. It also documents
 the fresh baseline to collect on Linux via SATA. The profile is erased during
 initialization even with boot excluded. The subsequent original rewrite trial
 now passes on the retained specimen.
 
-[STAGING_TEST.md](STAGING_TEST.md) provides an original-image RAM transfer test
+[STAGING_TEST.md](docs/STAGING_TEST.md) provides an original-image RAM transfer test
 for Linux via SATA. Preparation checks the fresh baseline and derives a pinned
 package offline; the standard-library live runner compares 512 staging blocks
 and excludes the flash finalization commands from its transport allowlist.
 
 The RAM test has passed with a verified 1,025-command journal and a subsequent
 byte-identical full original readback. A separate experimental original-only
-physical rewrite trial in [ORIGINAL_RESTORE_TEST.md](ORIGINAL_RESTORE_TEST.md)
+physical rewrite trial in [ORIGINAL_RESTORE_TEST.md](docs/ORIGINAL_RESTORE_TEST.md)
 also passes with full identical readback after reported power removal. The
 minimal patch write/marker/full-readback trial now passes as well, with exactly
 two expected changed bytes and advertised INQUIRY total 94 (96-byte received
 buffer including two padding bytes). Evidence and the prepared working-drive
-rollback path are documented in [INQUIRY94_FLASH_TEST.md](INQUIRY94_FLASH_TEST.md).
+rollback path are documented in [INQUIRY94_FLASH_TEST.md](docs/INQUIRY94_FLASH_TEST.md).
 Working-drive rollback from the patch also passes with exact original readback.
 Optical/media behavior remains unvalidated.
+
+## Native OmniDrive adapter development
+
+[NATIVE_ADAPTER.md](docs/NATIVE_ADAPTER.md) maps every `main.asm` patch onto this
+firmware: C in declared free space (`src/main.c` unchanged plus
+`src/liteon/mt1939.c`), assembly only for `bl` hooks and binary patches.
+`reverse_engineering/compare_mt1959.py` reproduces the comparison with the decoded MT1959 original,
+including its compressed RAM overlay. `patch_verify/verify_native_port.py` binds the offline
+evidence to the generated image. [OMNIDRIVE_PORT.md](docs/OMNIDRIVE_PORT.md) lists
+feature status and the physical test plan.

@@ -4,9 +4,10 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOLS = ROOT / "tools/liteon"
+sys.path.insert(0, str(ROOT / "tools/liteon"))
+import liteon_paths
 for name in ("read_flash", "decode_flash", "validate_flash", "audit_integrity", "trace_integrity"):
-    spec = importlib.util.spec_from_file_location(name, TOOLS / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(name, liteon_paths.tool(name))
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)

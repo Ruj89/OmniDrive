@@ -59,32 +59,7 @@ Currently the recommended method to flash the drives is to use `sdftool` which c
 
 [Redumper](https://github.com/superg/redumper) has initial support for flashing, but cannot cross-flash drives yet.
 
-## Experimental Lite-On firmware research
+## Experimental ASUS BW-12B1LT 1.03
 
-An experimental Linux reader for investigating the ASUS BW-12B1LT 1.03 is
-documented in [tools/liteon/README.md](tools/liteon/README.md). Reading, RAM staging,
-an original-image rewrite and the minimal INQUIRY-94 patch trial have passed on
-the retained specimen, including full readback after reported power removal.
-Working-drive rollback from the patch also passes with exact original readback; see
-[rollback evidence](tools/liteon/INQUIRY94_FLASH_TEST.md#working-drive-rollback).
-
-The current minimal firmware profile uses `asm/ASUS_BW-12B1LT_1.03.asm`.
-Place the decoded original at `firmware/ASUS_BW-12B1LT_1.03.bin`, then build the CMake
-target `ASUS_BW_12B1LT_1_03` with the normal project toolchain.
-The output is `patched_firmware/ASUS_BW-12B1LT_1.03_OmniDrive-1.0.4.bin`.
-This profile currently changes only the standard INQUIRY length and its
-LiteOn checksum; the full OmniDrive hooks are not yet implemented.
-
-[Native loader acceptance](tools/liteon/LOADER_ACCEPTANCE.md) is verified offline
-for the original backup and minimal OmniDrive patch, including corrupted-input
-rejection. The original and minimal patch rewrite trials pass with exact full
-readbacks. The patched drive advertises the expected 94-byte standard INQUIRY.
-Optical/media behavior remains unverified.
-
-The native handoff/writer/handler return is also audited with explicit
-controller/SPI models. An experimental Linux original-only physical rewrite
-trial is prepared in [tools/liteon/ORIGINAL_RESTORE_TEST.md](tools/liteon/ORIGINAL_RESTORE_TEST.md).
-It passed with cold-start full-image readback on the retained specimen. The
-minimal INQUIRY-94 trial also passed, with exactly the two expected changed bytes.
-Procedure, evidence and the prepared working-drive rollback path are documented
-in [tools/liteon/INQUIRY94_FLASH_TEST.md](tools/liteon/INQUIRY94_FLASH_TEST.md).
+See [LiteOn research and port status](tools/liteon/README.md) for the experimental
+profile, native adapter and validation evidence. Full OmniDrive support is pending.

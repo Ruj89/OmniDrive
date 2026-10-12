@@ -4,9 +4,10 @@ import struct
 import sys
 import unittest
 
-TOOLS = Path(__file__).resolve().parents[1] / "tools/liteon"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools/liteon"))
+import liteon_paths
 for name in ("read_flash", "decode_flash", "validate_flash"):
-    spec = importlib.util.spec_from_file_location(name, TOOLS / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(name, liteon_paths.tool(name))
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)

@@ -8,11 +8,11 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("reader", ROOT / "tools/liteon/read_flash.py")
+spec = importlib.util.spec_from_file_location("reader", ROOT / "tools/liteon/device/read_flash.py")
 reader = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reader)
 sys.modules["read_flash"] = reader
-decoder_spec = importlib.util.spec_from_file_location("decoder", ROOT / "tools/liteon/decode_flash.py")
+decoder_spec = importlib.util.spec_from_file_location("decoder", ROOT / "tools/liteon/dump_analysis/decode_flash.py")
 decoder = importlib.util.module_from_spec(decoder_spec)
 decoder_spec.loader.exec_module(decoder)
 

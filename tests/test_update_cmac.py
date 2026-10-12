@@ -11,6 +11,7 @@ from Crypto.Hash import CMAC
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools/liteon'))
+import liteon_paths  # noqa: F401  Puts every tool category on sys.path.
 import audit_integrity
 
 

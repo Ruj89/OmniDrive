@@ -8,7 +8,8 @@ from unittest.mock import patch as mock_patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/liteon"))
-spec = importlib.util.spec_from_file_location("audit_integrity", ROOT / "tools/liteon/audit_integrity.py")
+import liteon_paths  # noqa: F401  Puts every tool category on sys.path.
+spec = importlib.util.spec_from_file_location("audit_integrity", ROOT / "tools/liteon/dump_analysis/audit_integrity.py")
 patch = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patch)
 

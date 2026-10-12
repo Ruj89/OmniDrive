@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools/liteon'))
+import liteon_paths  # noqa: F401  Puts every tool category on sys.path.
 import inquiry94_trial as trial
 
 
@@ -126,11 +127,13 @@ class NativeTrialTests(unittest.TestCase):
         from Crypto.Cipher import AES
         original_package = ROOT / 'dump/bw12b1lt-original-restore-package'
         original = ROOT / 'firmware/ASUS_BW-12B1LT_1.03.bin'
-        patched = ROOT / 'patched_firmware/ASUS_BW-12B1LT_1.03_OmniDrive-1.0.4.bin'
         baseline = ROOT / 'dump'
-        if not all(p.exists() for p in (original_package, original, patched, baseline / 'report.json')):
+        if not all(p.exists() for p in (original_package, original, baseline / 'report.json')):
             self.skipTest('Pinned preparation inputs unavailable')
         with tempfile.TemporaryDirectory() as directory:
+            from audit_integrity import build
+            patched = Path(directory) / 'inquiry94.bin'
+            patched.write_bytes(build(original.read_bytes())[0])
             package = Path(directory) / 'package'
             trial.prepare(original_package, original, patched, baseline, package)
             for direction in ('apply', 'rollback'):
@@ -206,19 +209,20 @@ class NativeTrialTests(unittest.TestCase):
 
     def test_native_rollback_from_patched_firmware(self):
         original = ROOT / 'firmware/ASUS_BW-12B1LT_1.03.bin'
-        patched = ROOT / 'patched_firmware/ASUS_BW-12B1LT_1.03_OmniDrive-1.0.4.bin'
         report = ROOT / 'dump/report.json'
         binary = Path(os.environ.get('LITEON_TEST_UTILITY', '/tmp/omnidrive-Flash_Utility.exe'))
-        if not all(p.exists() for p in (original, patched, report, binary)) or not all(
+        if not all(p.exists() for p in (original, report, binary)) or not all(
                 importlib.util.find_spec(m) for m in ('unicorn', 'Crypto', 'pefile')):
             self.skipTest('Pinned native research inputs unavailable')
         from verify_loader import Utility
         from verify_handoff import run
+        from audit_integrity import build
+        patched = bytes(build(original.read_bytes())[0])
         inquiry = bytes.fromhex(json.loads(report.read_text())['extended_inquiry_hex'])
         utility = Utility(binary.read_bytes())
         for jedec in (0xc22015, 0xc22415):
             with self.subTest(jedec=jedec):
-                result = run(patched.read_bytes(), original.read_bytes(), inquiry, utility, jedec)
+                result = run(patched, original.read_bytes(), inquiry, utility, jedec)
                 self.assertTrue(result['final_array_matches_expected'])
                 self.assertEqual(result['final_array_sha256'], trial.staging.IMAGE_SHA256)
                 self.assertEqual(result['handler_invalid_field'], 0)
