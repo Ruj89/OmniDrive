@@ -35,7 +35,8 @@ def validate_evidence(path, original, generated):
     for name in ('startup', 'adapter', 'error_and_cache_hooks', 'addressing_and_controls',
                  'transfer_modes', 'media', 'identification', 'bd_rom_di', 'read_timer',
                  'cd_transfer', 'packet_reparse', 'data_transfer', 'queued_commands',
-                 'queued_nonreads', 'raw_state_and_recordable', 'zero_length', 'loader', 'programmer'):
+                 'queued_nonreads', 'raw_state_and_recordable', 'zero_length',
+                 'read_preparation', 'read_watchdog', 'loader', 'programmer'):
         require(isinstance(report.get(name), dict) and bool(report[name]),
                 f'Evidence missing audit: {name}')
     return report
@@ -61,6 +62,8 @@ def main():
     from verify_native_media import verify as media, verify_identification
     from verify_native_recognition import verify as recognition
     from verify_native_speed import verify as speed
+    from verify_native_read_preparation import verify as read_preparation
+    from verify_native_read_watchdog import verify as read_watchdog
     from verify_native_transfer import (verify as transfer, verify_packet_reparse,
                                         verify_data_transfer, verify_queued_commands,
                                         verify_raw_state_and_recordable, verify_queued_nonreads,
@@ -87,7 +90,8 @@ def main():
             ('queued_commands', verify_queued_commands),
             ('queued_nonreads', verify_queued_nonreads),
             ('raw_state_and_recordable', verify_raw_state_and_recordable),
-            ('zero_length', verify_zero_length)):
+            ('zero_length', verify_zero_length), ('read_preparation', read_preparation),
+            ('read_watchdog', lambda b: read_watchdog(candidate))):
         print(f'Verifying {name}...', flush=True)
         report[name] = verifier(original)
     if args.utility:

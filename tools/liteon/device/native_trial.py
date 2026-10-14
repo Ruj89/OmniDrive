@@ -19,9 +19,9 @@ import restore_original as restore
 import stage_update as staging
 from read_flash import SgDevice, ReadError, probe, dump as read_dump
 
-PATCH_SHA256 = '5eac461d23ebcd42ed80c53705822619d245d14a322396c1cb43983b65f9906d'
-PATCH_STAGED_SHA256 = 'd9498e416cc453e8b2d60a34bae43d7b54ea1e7b8c9e4af51915262fd8a2b909'
-PATCH_RAW_SHA256 = '1a304a8379612a5e813d862b33fcf9bf2eeb959a8b253d1f2935388889016a94'
+PATCH_SHA256 = 'db7979b10529b30732935dea22f12b4560f63316fc8da6fd6dac5eb3b951e413'
+PATCH_STAGED_SHA256 = 'fd78ec34cc239d5589ced7bc5a5152217340f87defccb71c29e0ea10f9843603'
+PATCH_RAW_SHA256 = 'fca70becd9db7ae28253fec388db3ba6fd834889de08d73a161348c82e92dc5f'
 sha, require = staging.sha, staging.require
 MANIFEST = {'format': 'bw12b1lt-native-trial-v1',
             'original_sha256': staging.IMAGE_SHA256, 'patched_sha256': PATCH_SHA256,
@@ -38,6 +38,41 @@ MANIFEST = {'format': 'bw12b1lt-native-trial-v1',
 PATCH_INQUIRY_SHA256 = '662f6cc177ad834239a1d8371f463090177f5fdcf271b1572b19e7d7fe852ca9'
 MARKER = b'OmniDrive\x01\x00\x04'
 MANIFEST['patched_inquiry_valid_sha256'] = PATCH_INQUIRY_SHA256
+
+# Encrypted reads reset AES-CBC every 128 bytes. With the pinned session,
+# aligned region hashes bind the preserved areas and native update machinery.
+FORCE_REGIONS = (
+    (0, 0x10000, '6abb42fa0568aafaa2dd1ce847663ec03699fedde28d71f9c21fec343d2603d4'),
+    (0x70000, 0x80000, 'a61069a60b379853f252655078835e9b308693c8807a99ce2c63023abdf382f1'),
+    (0x1e0000, 0x200000, '5253c3e5706a63e9e3add4cbb88adfa8bc30c0051acb0f3c8471962d0f87c85d'),
+    (0x18000, 0x1b000, '87957c5dc6816d76945bfa1a0dadb5a1ed1b1c68cfdbec9502b689d97d54b617'),
+    (0xa3000, 0xa4000, '0fc5c52d2f4f04008441abc48ea006a937240bef3a6e8ae843097e48d38475f4'),
+    (0x1ba000, 0x1bb000, 'e5e7d08e9abb2ceb30e658648d8992c12a39ed8fdf9e92ae571ed12ac61e8c6a'),
+)
+
+
+def check_force_live(report):
+    standard = bytes.fromhex(report['standard_inquiry_hex'])
+    if standard[74:86] == MARKER:
+        check_live(report, 'rollback')
+    else:
+        check_live(report, 'apply')
+
+
+def check_force_baseline(directory):
+    report = json.loads((directory / 'report.json').read_text())
+    check_force_live(report)
+    first = (directory / 'flash1.raw.bin').read_bytes()
+    second = (directory / 'flash2.raw.bin').read_bytes()
+    digest = sha(first)
+    require(len(first) == staging.SIZE and first == second and
+            report.get('complete') is True and report.get('reads_match') is True and
+            report.get('hashes') == [digest, digest],
+            'Force requires two complete matching source backup reads')
+    for start, end, expected in FORCE_REGIONS:
+        require(sha(first[start:end]) == expected,
+                f'Force rejected incompatible preserved/update region {start:#x}:{end:#x}')
+    return digest
 
 
 def check_live(report, direction):
@@ -154,17 +189,22 @@ class TrialDevice(restore.RestoreDevice):
         return super().stage_original(progress)
 
 
-def run_trial(directory, baseline, device_path, output, direction):
+def run_trial(directory, baseline, device_path, output, direction, *, force_source=False):
+    require(not force_source or direction == 'apply', 'Force is only supported for apply')
     profile, staged, tag, manifest = load_package(directory, direction)
-    check_baseline(baseline, direction)
+    if force_source:
+        forced_raw = check_force_baseline(baseline)
+    else:
+        check_baseline(baseline, direction)
     output.mkdir(parents=True, exist_ok=False)
     applying = direction == 'apply'
-    source_raw = restore.RAW_SHA256 if applying else PATCH_RAW_SHA256
+    source_raw = forced_raw if force_source else (restore.RAW_SHA256 if applying else PATCH_RAW_SHA256)
     target_sha = PATCH_SHA256 if applying else staging.IMAGE_SHA256
     summary = {'stage': 'native_physical_trial', 'direction': direction, 'device': device_path,
                'package_sha256': sha((directory / 'trial.json').read_bytes()),
                'source_raw_sha256': source_raw, 'target_decoded_sha256': target_sha,
-               'boot_update': False, 'live_preflight_matches_source': False, 'all_blocks_matched': False,
+               'boot_update': False, 'force_source': force_source,
+               'live_preflight_matches_source': False, 'all_blocks_matched': False,
                'finalization_attempted': False, 'finalization_sent': False,
                'finalization_transport_accepted': False, 'physical_flash_verified': False,
                'flash_ready': False, 'outcome': 'preflight'}
@@ -175,9 +215,13 @@ def run_trial(directory, baseline, device_path, output, direction):
         with (output / 'transport.jsonl').open('x') as journal:
             device = TrialDevice(device_path, profile, staged, tag, journal, direction)
             live = probe(device)
-            check_live(live, direction)
+            if force_source:
+                check_force_live(live)
+            else:
+                check_live(live, direction)
             restore.durable_json(output / 'preflight-probe.json', live)
-            print(f'Read-only preflight: require {"original" if applying else "MT1939 OmniDrive"} flash...', flush=True)
+            print('Read-only preflight: require exact verified source backup...' if force_source else
+                  f'Read-only preflight: require {"original" if applying else "MT1939 OmniDrive"} flash...', flush=True)
             raw_sha = read_dump(device, live, output / 'live-preflight.raw.bin')
             require(raw_sha == source_raw, 'Current flash differs from expected source; no update commands sent')
             summary.update(live_preflight_matches_source=True, preflight_raw_sha256=raw_sha,
@@ -225,6 +269,9 @@ def main():
         run.add_argument('--baseline', type=Path, required=True)
         run.add_argument('--device', required=True)
         run.add_argument('--output', type=Path, required=True)
+        if action == 'apply':
+            run.add_argument('--force-source', action='store_true',
+                             help='Accept a backed-up compatible source instead of requiring the original full hash')
     args = parser.parse_args()
     try:
         if args.action == 'prepare':
@@ -236,7 +283,8 @@ def main():
             result = load_package(args.package, 'apply')[3]
             check_baseline(args.baseline, 'apply')
         else:
-            result = run_trial(args.package, args.baseline, args.device, args.output, args.action)
+            result = run_trial(args.package, args.baseline, args.device, args.output, args.action,
+                               force_source=getattr(args, 'force_source', False))
         print(json.dumps(result, indent=2))
         return 0
     except (OSError, ValueError, KeyError, ReadError, ImportError, KeyboardInterrupt) as error:

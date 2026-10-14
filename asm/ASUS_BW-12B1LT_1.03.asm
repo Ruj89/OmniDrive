@@ -46,6 +46,8 @@ OriginalFirmware equ "../firmware/ASUS_BW-12B1LT_1.03.bin"
 .definedatalabel DISC_SECTOR_REGISTER,0x04050064
 
 ; Functions
+.definethumblabel MtNativeReadPrepare,0x000398 ; native low alias of flash 0x010398
+.definethumblabel MtNativeReadAccount,0x01CA56 ; READ(10/12) counter/timestamp body
 .definethumblabel MtNativeReady,0x01AFB4
 .definethumblabel ChangeDiscRWMode,0x045B8A
 .definethumblabel SetErrorMode,0x046918
@@ -68,6 +70,9 @@ OriginalFirmware equ "../firmware/ASUS_BW-12B1LT_1.03.bin"
 .definethumblabel MtNativeReadDVDData,0x1BF38C
 
 ; Inline patches
+.definedatalabel ReceiveReadClassifyAddr,0x0101A2 ; runs through low alias 0x1A2
+.definedatalabel ReceiveReadSetupAddr,0x0101B4
+.definedatalabel ReceiveReadSetupEndAddr,0x0101BE
 .definedatalabel BDReadCmdHookAddr,0x01B43C
 .definedatalabel DVDReadCmdHookAddr,0x01B47E
 .definedatalabel DispatchHookAddr,0x01BBA4 // default arm: sense 05/20/00

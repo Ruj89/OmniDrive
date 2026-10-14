@@ -7,6 +7,8 @@ these files are run from the repository root.
 
 | File | Content |
 | --- | --- |
+| [MT1939_WII_DEBUG_RIEPILOGO_IT.md](MT1939_WII_DEBUG_RIEPILOGO_IT.md) | Italian summary of the Wii C0 failure, physical results, firmware attempts and open questions. |
+| [MT1939_WII_WATCHDOG_IT.md](MT1939_WII_WATCHDOG_IT.md) | Missing READ timestamp, exact native 03/11/05 timeout reproduction and experimental correction. |
 | [PORTING.md](PORTING.md) | MT1939 porting study: function map, small-function emulation, integrity header. |
 | [SCSI_MAP.md](SCSI_MAP.md) | Command reception, dispatch, read parameters/FUA, data-in and sense. |
 | [INTEGRITY.md](INTEGRITY.md) | Integrity audit, selector experiments, readback comparator. |

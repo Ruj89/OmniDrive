@@ -39,6 +39,8 @@ PROFILE_CHECKSUM_OFFSET = 0x1dfff8
 FORCE_UNIT_ACCESS = 0x020006fd
 
 DISPATCH_HOOK = 0x1bba4
+RECEIVE_CLASSIFY = 0x101a2
+RECEIVE_CLASSIFY_ORIGINAL = bytes.fromhex('2078282805d02078a82802d02078be2804d1')
 # Native BL sites -> (original callee, hook). Shared main.c hooks where MT1939
 # has the MT1959 mechanism; Mt1939* where it differs.
 MODE_HOOKS = (0xa59c6, 0x1bf410, 0xb588c, 0xe3384)  # generic, DVD, BD, RAM
@@ -71,6 +73,7 @@ TRANSFER_HOOKS = {0x1bf9fe: ('Mt1939DVDTransferModeHook', 10),
 def reviewed_offsets():
     """File offsets the production profile may change."""
     allowed = set(range(DISPATCH_HOOK, DISPATCH_HOOK + 8))
+    allowed.update(range(RECEIVE_CLASSIFY, RECEIVE_CLASSIFY + len(RECEIVE_CLASSIFY_ORIGINAL)))
     for site in (*MODE_HOOKS, *ERROR_HOOKS, *READ_CHECK_HOOKS, *NORMAL_READ_HOOKS,
                  *CONTINUATION_HOOKS):
         allowed.update(range(site, site + 4))
@@ -120,6 +123,8 @@ def _call_target(image, site):
 
 def check_original_sites(original):
     """Each patched native instruction is the call or byte it is documented as."""
+    if original[RECEIVE_CLASSIFY:RECEIVE_CLASSIFY + len(RECEIVE_CLASSIFY_ORIGINAL)] != RECEIVE_CLASSIFY_ORIGINAL:
+        raise ValueError('Unexpected native packet receive classification')
     callees = {**{s: 0x45b8a for s in MODE_HOOKS}, **{s: 0x46918 for s in ERROR_HOOKS},
                **{s: t for s, (t, _) in (READ_CHECK_HOOKS | NORMAL_READ_HOOKS).items()}}
     for site, target in callees.items():

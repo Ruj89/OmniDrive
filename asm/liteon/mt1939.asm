@@ -21,6 +21,23 @@
 .thumb
 .endregion
 
+; Native packet reception clears the low half of 0x040400C4 for READs.
+; Include C0 at the same point, before dispatch/readiness. Removing duplicate
+; opcode loads fits the extra comparison in the original 18 bytes. Branches
+; are PC-relative, so they also work when this block runs at its low alias.
+.org ReceiveReadClassifyAddr
+.area 18
+    ldrb r0,[r4]
+    cmp r0,#0x28
+    beq ReceiveReadSetupAddr
+    cmp r0,#0xA8
+    beq ReceiveReadSetupAddr
+    cmp r0,#0xBE
+    beq ReceiveReadSetupAddr
+    cmp r0,#0xC0
+    bne ReceiveReadSetupEndAddr
+.endarea
+
 ; READ DISC RAW (C0h): no command table, so use the dispatcher's default arm
 .org DispatchHookAddr
 .area 8

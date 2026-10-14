@@ -11,6 +11,41 @@ from native_adapter import assemble
 
 
 class NativeAdapterTests(unittest.TestCase):
+    def test_raw_reads_refresh_native_no_progress_watchdog(self):
+        path = ROOT / 'firmware/ASUS_BW-12B1LT_1.03.bin'
+        if not path.exists() or shutil.which('armips') is None:
+            self.skipTest('Pinned local specimen and armips are required')
+        from verify_native_read_watchdog import verify
+        result = verify(assemble(path.read_bytes())[0])
+        self.assertEqual(result['receive_opcode_cases'], 256)
+        self.assertEqual(len(result['raw_cases']), 81)
+        self.assertEqual(len(result['skipped_cases']), 4)
+        self.assertFalse(result['optical_transfer_verified'])
+
+    def test_c0_receive_setup_and_non_c0_preservation(self):
+        path = ROOT / 'firmware/ASUS_BW-12B1LT_1.03.bin'
+        if not path.exists() or shutil.which('armips') is None:
+            self.skipTest('Pinned local specimen and armips are required')
+        from verify_native_read_preparation import verify_receive
+        original = path.read_bytes()
+        result = verify_receive(original, assemble(original)[0])
+        self.assertEqual(len(result['opcode_cases']), 256 * 3)
+        self.assertEqual(len(result['receive_to_reader_cases']), 12)
+        self.assertFalse(result['optical_transfer_verified'])
+
+    def test_c0_performs_same_native_preparation_as_ordinary_reads(self):
+        path = ROOT / 'firmware/ASUS_BW-12B1LT_1.03.bin'
+        if not path.exists() or shutil.which('armips') is None:
+            self.skipTest('Pinned local specimen and armips are required')
+        from verify_native_read_preparation import verify
+        result = verify(path.read_bytes())
+        self.assertEqual(len(result['native_read_cases']), 12)
+        self.assertEqual(len(result['c0_preparation_cases']), 12)
+        self.assertEqual(len(result['repeated_c0_preparation_cases']), 12)
+        self.assertTrue(all(not case['native_read_priming']
+                            for case in result['repeated_c0_preparation_cases']))
+        self.assertFalse(result['optical_transfer_verified'])
+
     def test_unknown_specimen_is_rejected_before_assembly(self):
         for image in (b'', bytes(0x200000)):
             with self.assertRaisesRegex(ValueError, 'exact original'):

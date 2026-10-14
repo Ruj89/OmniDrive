@@ -1,14 +1,26 @@
 # BW-12B1LT 1.03: full MT1939 OmniDrive candidate trial
 
+For the consolidated handoff ZIP, use [FLASH_MT1939_IT.md](FLASH_MT1939_IT.md).
+It supports a guarded direct update with --force-source and fresh live backups; the earlier bundles
+and historical baseline paths below are not required for that procedure.
+The current runner pins the watchdog candidate `db7979b1…`; the instructions
+below describe the older read-preparation candidate and require its archived
+runner. See [MT1939_WII_WATCHDOG_IT.md](MT1939_WII_WATCHDOG_IT.md).
+
 This procedure is for the exact retained ASUS BW-12B1LT specimen on SATA and
 OmniDrive 1.0.4 candidate SHA-256
-`5eac461d23ebcd42ed80c53705822619d245d14a322396c1cb43983b65f9906d`.
-This candidate includes the zero-sector C0 no-op fix. Earlier full-port
+`56432d9b48213aea5ea4f82e0146e319083ec609a426b1510a45b2c8cad5dcf9`.
+This candidate includes the zero-sector C0 no-op fix and explicit native READ preparation. Earlier full-port
 packages refer to a different image and must not be used for this trial.
 It is an experimental hardware test, not established optical support.
 `native_trial.py` pins decoded, staged and raw-read hashes independently of
 package manifests. The original-only and historical INQUIRY-94 runners retain
 their original restrictions; neither is the rollback runner for this image.
+
+If the previous zero-length candidate is already installed, first follow
+[NATIVE_READ_PREPARATION_TEST.md](NATIVE_READ_PREPARATION_TEST.md) to restore
+the original with the previous bundle. This runner accepts only original flash
+for apply and the new candidate for rollback.
 
 ## Offline preparation
 
@@ -24,12 +36,12 @@ python tools/liteon/device/native_trial.py prepare \
   --original-package dump/bw12b1lt-original-restore-package \
   --original firmware/ASUS_BW-12B1LT_1.03.bin \
   --patched patched_firmware/ASUS_BW-12B1LT_1.03_OmniDrive-1.0.4.bin \
-  --baseline dump/dump/bw12b1lt-after-inquiry94-rollback \
-  --evidence dump/mt1939-zero-length-evidence-20261012.json \
-  --output dump/bw12b1lt-native-zero-length-package
+  --baseline dump/bw12b1lt-native-original-baseline \
+  --evidence dump/mt1939-force-source-evidence.json \
+  --output dump/bw12b1lt-native-read-prepare-restart-package
 ```
 
-The prepared bundle `dump/bw12b1lt-native-zero-length-test.zip` includes the fixed package,
+The prepared bundle `dump/bw12b1lt-native-read-prepare-restart-test.zip` includes the fixed package,
 original backup, candidate, evidence and Python runtime helpers. Keep it private.
 Extract it in the repository root on the SATA PC. The remaining commands need
 only Python 3's standard library. All output directories must be new.
@@ -39,7 +51,7 @@ scripts directly in `tools/liteon/`; with such a bundle, drop the subfolder
 
 ```sh
 python3 tools/liteon/device/native_trial.py inspect \
-  --package dump/bw12b1lt-native-zero-length-package \
+  --package dump/bw12b1lt-native-read-prepare-restart-package \
   --baseline dump/bw12b1lt-native-original-baseline
 ```
 
@@ -49,9 +61,9 @@ With no disc inserted and other drive-using applications closed:
 
 ```sh
 sudo python3 tools/liteon/device/native_trial.py apply \
-  --package dump/bw12b1lt-native-zero-length-package \
+  --package dump/bw12b1lt-native-read-prepare-restart-package \
   --baseline dump/bw12b1lt-native-original-baseline \
-  --device /dev/sr0 --output dump/bw12b1lt-native-apply-01
+  --device /dev/sr0 --output dump/bw12b1lt-native-read-prepare-apply-01
 ```
 
 **This writes physical flash.** Keep drive power connected until the process
@@ -74,9 +86,9 @@ then acquire and verify two complete reads:
 
 ```sh
 sudo python3 tools/liteon/device/read_flash.py /dev/sr0 \
-  --dump --output dump/bw12b1lt-after-native
+  --dump --output dump/bw12b1lt-after-read-prepare
 python3 tools/liteon/device/native_trial.py verify-readback \
-  --state candidate --baseline dump/bw12b1lt-after-native
+  --state candidate --baseline dump/bw12b1lt-after-read-prepare
 ```
 
 Acceptance requires both full raw hashes to equal the pinned candidate stream,
@@ -101,9 +113,9 @@ original using the same fixed package:
 
 ```sh
 sudo python3 tools/liteon/device/native_trial.py rollback \
-  --package dump/bw12b1lt-native-zero-length-package \
-  --baseline dump/bw12b1lt-after-native \
-  --device /dev/sr0 --output dump/bw12b1lt-native-rollback-01
+  --package dump/bw12b1lt-native-read-prepare-restart-package \
+  --baseline dump/bw12b1lt-after-read-prepare \
+  --device /dev/sr0 --output dump/bw12b1lt-native-read-prepare-rollback-01
 ```
 
 Rollback validates both candidate backup reads and both INQUIRY signatures,
@@ -117,9 +129,9 @@ two reads and verify the original:
 
 ```sh
 sudo python3 tools/liteon/device/read_flash.py /dev/sr0 \
-  --dump --output dump/bw12b1lt-after-native-rollback
+  --dump --output dump/bw12b1lt-after-read-prepare-rollback
 python3 tools/liteon/device/native_trial.py verify-readback \
-  --state original --baseline dump/bw12b1lt-after-native-rollback
+  --state original --baseline dump/bw12b1lt-after-read-prepare-rollback
 ```
 
 Retain apply/rollback result directories and both readback directories.

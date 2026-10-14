@@ -72,6 +72,15 @@ the layer decode and classifies dual-layer discs as single-layer (emulated:
 - `Mt1939DispatchHook`: opcode check, 24-bit DMA count, native readiness,
   medium/type/field validation, then the shared `CmdOmniDriveReadDiscRaw`;
   restores the sector format and descrambling bits after the reader returns.
+- `MtNativeReadPrepare`: after validation and the zero-sector guard, C0 calls
+  the native READ preparation at the low alias `0x398` (flash `0x10398`).
+  `MtNativeReady(1)` calls it for READ(10/12), READ CD and READ CD MSF, but not
+  for C0. It sets `0x000b0000` in `0x04041050` and `0x100` in `0x04040098`.
+  Without this call a raw request depends on transfer state left by earlier
+  native reads. The regression executes native readiness and compares C0's
+  register setup with the four native READ opcodes. The missing setup is
+  proven offline; its relationship to the physical Wii `03/11/05` error
+  remains a hypothesis until the corrected candidate is tested.
 - `Mt1939ReadDVDTOCHook`, `Mt1939SetBDCharacteristicsHook`,
   `Mt1939DVDCharacteristicsHook`: see the table.
 - `Mt1939DVDTransferModeHook`, `Mt1939CopyTransferModeHook`: MT1939-only
@@ -188,6 +197,7 @@ inputs and checks image regeneration, then confirms an unchanged build is idle.
 | Identification | Native template copy and INQUIRY responses for 7 allocation lengths |
 | CD / DVD/RAM/BD transfer | 144 / 216 cases through native DMA setup and cleanup |
 | Zero-length C0 | 44 valid requests return without entering readers, writing MMIO or changing read state |
+| Native read preparation | 12 native READ and 12 C0 cases execute native readiness and compare transfer-register setup |
 | Packet consistency | 90 native address-parser cases |
 | Queued commands | 24 READ(10/12) cleanup/dispatch cases incl. nonzero upper format bits; 252 gate contracts across formats, opcodes and packet-ready values; 36 C0/INQUIRY/TUR cases return after one packet check without idle waiting or synthetic ticks (DVD/RAM's initial timer check is preserved) |
 | DVD-R/RAM request state | 16 full transfer/cancellation cases with both previous and requested descrambling settings; rejected native DVD-R checks reach raw DMA without stale sense |

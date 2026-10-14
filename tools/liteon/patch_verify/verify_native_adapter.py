@@ -24,7 +24,8 @@ SECTOR_FORMAT = 0x04050064
 READERS = {4: 0x18ae2c, 0x40: 0x1bf38c, 0x50: 0xe3370, 0xc0: 0xb5828}
 MODE_CALLEES = (0x45998, 0x41a44, 0x448a0, 0x41f16, 0x421de,
                 0x4233e, 0x44b14, 0x44e50, 0x44eba)
-NATIVE_RANGES = [(0x1b14e, 0x1bdea), (0xe8ba0, 0xe8bbc),
+NATIVE_RANGES = [(0x1b14e, 0x1bdea), (0xe8ba0, 0xe8bbc), (0x398, 0x3be),
+                 (0x1ca48, 0x1ca68),
                  (0x1bd8d8, 0x1bd93c), (0x1b9b0c, 0x1b9b24),
                  (0x1bbc1c, 0x1bbd70),
                  (0xcb78a, 0xcb7e2),
@@ -34,7 +35,8 @@ NATIVE_RANGES = [(0x1b14e, 0x1bdea), (0xe8ba0, 0xe8bbc),
 class AdapterExperiment(Experiment):
     def __init__(self, overlay, *, stubs=None, stops=(), ranges=()):
         super().__init__(overlay, NATIVE_RANGES + [(FLASH_PAYLOAD_BASE, FLASH_PAYLOAD_LIMIT)] + list(ranges),
-                         stubs={0x1afb4: 1, **(stubs or {})}, stops=stops)
+                         stubs={0x1afb4: 1, 0x28c30: 0xd3, 0x28c28: 0,
+                                **(stubs or {})}, stops=stops)
 
     def raw_marked(self):
         """main.c marks DVD/BD raw reads as READ(12) with CDB[1] bit 7."""

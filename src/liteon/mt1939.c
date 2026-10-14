@@ -30,6 +30,8 @@ extern void MtNativeReadBDData(DWORD fua);
 extern DWORD MtNativeDVDCheckLayer(DWORD type);
 extern DWORD MtNativeDVDPSN(DWORD address);
 extern DWORD MtNativeReady(DWORD mode);
+extern void MtNativeReadPrepare(void);
+extern void MtNativeReadAccount(void);
 extern DWORD MtNativeDVDCharacteristics(DWORD pfi);
 
 static DWORD be32(const BYTE *p) {
@@ -137,6 +139,16 @@ void Mt1939DispatchHook(void) {
     /* A valid zero-sector request is a no-op. Native DMA setup can retain
      * the previous count when passed zero, so do not enter any reader. */
     if (!(cdb[7] | cdb[8] | cdb[9])) return;
+    /* NativeReady prepares transfers only for its known READ opcodes. C0
+     * reaches the default dispatch arm, so perform the same setup for every
+     * request: an earlier ordinary READ or host priming must not be required. */
+    MtNativeReadPrepare();
+    /* Reception accounts only for READ(10/12). DVD/BD raw reads become A8
+     * below, so the native no-progress watchdog will use that timestamp too.
+     * Seed it for this request, otherwise an old timestamp can immediately
+     * produce 03/11/05. Enter the native accounting body past its opcode test;
+     * do not change the CDB before shared raw parsing. CD does not spoof A8. */
+    if (kind != 0) MtNativeReadAccount();
     /* Keep raw sector selection local to this request. Native readers must
      * return before consuming another packet (Mt1939ContinuationPendingHook),
      * so the dispatcher sees both that packet and the original controls. */

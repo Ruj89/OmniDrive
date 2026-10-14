@@ -43,7 +43,7 @@ class TrialTests(unittest.TestCase):
             with self.subTest(field=field, offset=offset), self.assertRaises(trial.staging.ReadError):
                 trial.check_live(changed, 'rollback')
 
-    def run_fake(self, direction, fault=None):
+    def run_fake(self, direction, fault=None, force_source=False):
         class Device:
             def __init__(self):
                 self.commands = 0
@@ -73,20 +73,68 @@ class TrialTests(unittest.TestCase):
             (package / 'trial.json').write_text('{}')
             device = Device()
             source = trial.restore.RAW_SHA256 if direction == 'apply' else trial.PATCH_RAW_SHA256
+            if force_source:
+                source = 'verified-other-source'
             with patch.object(trial, 'load_package', return_value=(b'', b'', b'', {})), \
                  patch.object(trial, 'check_baseline'), \
+                 patch.object(trial, 'check_force_baseline', return_value=source), \
+                 patch.object(trial, 'check_force_live'), \
                  patch.object(trial, 'TrialDevice', return_value=device), \
                  patch.object(trial, 'probe', return_value={'identity': trial.restore.IDENTITY}), \
                  patch.object(trial, 'check_live') as live_check, \
                  patch.object(trial, 'read_dump', return_value='wrong' if fault == 'source' else source):
                 if fault:
                     with self.assertRaises(trial.staging.ReadError):
-                        trial.run_trial(package, package, '/dev/not-opened', package / 'output', direction)
+                        trial.run_trial(package, package, '/dev/not-opened', package / 'output', direction, force_source=force_source)
                 else:
-                    trial.run_trial(package, package, '/dev/not-opened', package / 'output', direction)
-                self.assertEqual(live_check.call_args.args[1], direction)
+                    trial.run_trial(package, package, '/dev/not-opened', package / 'output', direction, force_source=force_source)
+                if not force_source:
+                    self.assertEqual(live_check.call_args.args[1], direction)
             self.assertTrue(device.closed)
             return json.loads((package / 'output/trial-result.json').read_text())
+
+    def test_force_still_gates_live_source_staging_and_once_only_finalization(self):
+        result = self.run_fake('apply', force_source=True)
+        self.assertEqual(result['source_raw_sha256'], 'verified-other-source')
+        self.assertEqual(result['target_decoded_sha256'], trial.PATCH_SHA256)
+        self.assertTrue(result['force_source'])
+        for fault in ('source', 'stage', 'final'):
+            result = self.run_fake('apply', fault, force_source=True)
+            if fault == 'source':
+                self.assertEqual(result['update_commands_issued'], 0)
+            if fault != 'final':
+                self.assertFalse(result['finalization_attempted'])
+            else:
+                self.assertEqual(result['update_commands_issued'], 1026)
+                self.assertIsNone(result['finalization_sent'])
+        with self.assertRaises(trial.staging.ReadError):
+            trial.run_trial(Path('/never'), Path('/never'), '/never', Path('/never'), 'rollback', force_source=True)
+
+    def test_force_requires_matching_backups_and_compatible_regions(self):
+        live = json.loads((ROOT / 'dump/report.json').read_text())
+        original = (ROOT / 'dump/flash1.raw.bin').read_bytes()
+        with tempfile.TemporaryDirectory() as d:
+            baseline = Path(d)
+            def write(raw, second=None):
+                report = dict(live, complete=True, reads_match=True, hashes=[trial.sha(raw)] * 2)
+                (baseline / 'report.json').write_text(json.dumps(report))
+                (baseline / 'flash1.raw.bin').write_bytes(raw)
+                (baseline / 'flash2.raw.bin').write_bytes(raw if second is None else second)
+            write(original)
+            self.assertEqual(trial.check_force_baseline(baseline), trial.restore.RAW_SHA256)
+            changed = bytearray(original)
+            changed[0x100000] ^= 1
+            write(changed)
+            self.assertEqual(trial.check_force_baseline(baseline), trial.sha(changed))
+            write(changed, original)
+            with self.assertRaises(trial.staging.ReadError):
+                trial.check_force_baseline(baseline)
+            for start, end, digest in trial.FORCE_REGIONS:
+                changed = bytearray(original)
+                changed[start] ^= 1
+                write(changed)
+                with self.subTest(start=start), self.assertRaises(trial.staging.ReadError):
+                    trial.check_force_baseline(baseline)
 
     def test_both_directions_require_exact_current_source_before_data_out(self):
         for direction in ('apply', 'rollback'):
@@ -122,6 +170,58 @@ class TrialTests(unittest.TestCase):
 
 
 class NativeTrialTests(unittest.TestCase):
+    def test_direct_read_prepare_and_receive_candidates_to_watchdog_fix(self):
+        from verify_loader import Utility
+        from verify_handoff import run
+        target = (ROOT / 'patched_firmware/ASUS_BW-12B1LT_1.03_OmniDrive-1.0.4.bin').read_bytes()
+        self.assertEqual(trial.sha(target), trial.PATCH_SHA256)
+        report = json.loads((ROOT / 'dump/report.json').read_text())
+        inquiry = bytearray.fromhex(report['extended_inquiry_hex'])
+        inquiry[74:86] = trial.MARKER
+        utility = Utility(Path(os.environ.get('LITEON_TEST_UTILITY', '/tmp/omnidrive-Flash_Utility.exe')).read_bytes())
+        for filename, digest in (
+                ('read-prepare-candidate.bin', '56432d9b48213aea5ea4f82e0146e319083ec609a426b1510a45b2c8cad5dcf9'),
+                ('receive-fix-candidate.bin', '535510d835843bca12094eb8380564574cc920978e7b08bb8b5c63bd923b0c56')):
+            source = (ROOT / 'dump' / filename).read_bytes()
+            self.assertEqual(trial.sha(source), digest)
+            for jedec in (0xc22015, 0xc22415):
+                with self.subTest(source=filename, jedec=jedec):
+                    result = run(source, target, bytes(inquiry), utility, jedec)
+                    self.assertTrue(result['final_array_matches_expected'])
+                    self.assertEqual(result['final_array_sha256'], trial.PATCH_SHA256)
+
+    def test_direct_previous_candidate_to_new_native_handoff(self):
+        from Crypto.Cipher import AES
+        from verify_loader import Utility
+        from verify_handoff import run
+        source = (ROOT / 'dump/previous-candidate.bin').read_bytes()
+        self.assertEqual(trial.sha(source), '5eac461d23ebcd42ed80c53705822619d245d14a322396c1cb43983b65f9906d')
+        target = (ROOT / 'patched_firmware/ASUS_BW-12B1LT_1.03_OmniDrive-1.0.4.bin').read_bytes()
+        self.assertEqual(trial.sha(target), trial.PATCH_SHA256)
+        report = json.loads((ROOT / 'dump/report.json').read_text())
+        inquiry = bytearray.fromhex(report['extended_inquiry_hex'])
+        inquiry[74:86] = trial.MARKER
+        standard = bytearray.fromhex(report['standard_inquiry_hex'])
+        standard[74:86] = trial.MARKER
+        raw = b''.join(AES.new(bytes(inquiry[148:164]), AES.MODE_CBC, bytes(inquiry[16:32])).encrypt(source[i:i + 128])
+                       for i in range(0, len(source), 128))
+        with tempfile.TemporaryDirectory() as d:
+            baseline = Path(d)
+            report.update(standard_inquiry_hex=standard.hex(), extended_inquiry_hex=inquiry.hex(),
+                          complete=True, reads_match=True, hashes=[trial.sha(raw)] * 2)
+            (baseline / 'report.json').write_text(json.dumps(report))
+            for name in ('flash1.raw.bin', 'flash2.raw.bin'):
+                (baseline / name).write_bytes(raw)
+            self.assertEqual(trial.check_force_baseline(baseline),
+                             '1a304a8379612a5e813d862b33fcf9bf2eeb959a8b253d1f2935388889016a94')
+            with self.assertRaises(trial.staging.ReadError):
+                trial.check_baseline(baseline, 'apply')
+        utility = Utility(Path(os.environ.get('LITEON_TEST_UTILITY', '/tmp/omnidrive-Flash_Utility.exe')).read_bytes())
+        for jedec in (0xc22015, 0xc22415):
+            result = run(source, target, bytes(inquiry), utility, jedec)
+            self.assertTrue(result['final_array_matches_expected'])
+            self.assertEqual(result['final_array_sha256'], trial.PATCH_SHA256)
+
     def test_payload_derivation_and_both_guarded_transports(self):
         if importlib.util.find_spec('Crypto') is None:
             self.skipTest('Optional cryptography dependency unavailable')
