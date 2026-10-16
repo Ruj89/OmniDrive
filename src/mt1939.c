@@ -7,8 +7,8 @@
  * addresses are labels in asm/ASUS_BW-12B1LT_1.03.asm. No data or RAM is
  * allocated; like main.c, a raw read is marked in the CDB itself.
  */
-#include "../defs.h"
-#include "../mmio.h"
+#include "defs.h"
+#include "mmio.h"
 
 /* Shared main.c entry points (main.c has no header). */
 void WriteDiscStructMemByte(DWORD offset, BYTE value);

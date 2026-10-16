@@ -1,10 +1,6 @@
 import argparse
-from pathlib import Path
 import struct
-import sys
-
-from Crypto.Hash import CMAC
-from Crypto.Cipher import AES
+from pathlib import Path
 
 MT1959_CMAC_KEY = bytes.fromhex('BD209408E35E526A36235234434FE8AB')
 cmac_range_fmt = '<3L16s'
@@ -14,11 +10,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument("firmware_file")
 args = parser.parse_args()
 
-# MT1939 uses a native word sum; preserve the historical CMAC path otherwise.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools/liteon/patch_build'))
-from finalize_native import finalize_if_native
-if finalize_if_native(args.firmware_file):
-    sys.exit(0)
+# MT1939 uses native LE32 word sums instead of the MT1959 CMAC. Match the
+# image identity rather than its filename, so other profiles keep the CMAC path.
+image = bytearray(Path(args.firmware_file).read_bytes())
+identity = b'ASUS    BW-12B1LT       1.032011/04/18 21:15    '
+if len(image) == 0x200000 and image[0x1c6f40:0x1c6f40 + len(identity)] == identity:
+    for start, end, offset in ((0x10000, 0x1cfdf8, 0x1cfff8),
+                               (0x1d0000, 0x1dfff8, 0x1dfff8)):
+        checksum = sum(word[0] for word in struct.iter_unpack('<I', image[start:end])) & 0xffffffff
+        struct.pack_into('<I', image, offset, checksum)
+    Path(args.firmware_file).write_bytes(image)
+    print('MT1939 image: native word sums set; MT1959 CMAC skipped')
+    raise SystemExit(0)
+del image
+
+from Crypto.Hash import CMAC
+from Crypto.Cipher import AES
 
 def calc_cmac(cmac_struct):
     enabled, start, end, original_cmac = struct.unpack(cmac_range_fmt, cmac_struct)
