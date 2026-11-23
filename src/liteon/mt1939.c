@@ -95,10 +95,12 @@ DWORD DVDCheckLayer(DWORD discType) {
     return MtNativeDVDCheckLayer(discType);
 }
 
-/* EnableXGD retries keep their requested PSN across native reader work. */
+/* EnableXGD retries keep their requested PSN across native reader work.
+ * MT1959's raw area 8 has no MT1939 native user; MT1939 reads raw PSNs
+ * (lead-in control data) with area 4 only. */
 DWORD ReadDiscData(DWORD discArea, BYTE sectorCount) {
     DWORD address = startAddress;
-    DWORD result = MtNativeReadDiscData(discArea, sectorCount);
+    DWORD result = MtNativeReadDiscData(discArea == 8 ? 4 : discArea, sectorCount);
     startAddress = address;
     return result;
 }
