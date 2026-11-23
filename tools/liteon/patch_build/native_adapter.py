@@ -52,6 +52,7 @@ READ_CHECK_HOOKS = {0x1bf3ba: (0x17d57c, 'Mt1939DVDMinusReadCheckHook'),
                     0xa24d4: (0xcc184, 'Mt1939ReadDVDTOCHook'),
                     0xa1e10: (0xb0fe6, 'Mt1939SetBDCharacteristicsHook')}
 NORMAL_READ_HOOKS = {0x1b47e: (0xc8404, 'DVDReadCmdHook'),
+                     0x1b500: (0xc8b20, 'Mt1939DVDReadCapacityHook'),
                      0x1b43c: (0xace90, 'BDReadCmdHook')}
 IDENTIFICATION_SPANS = ((0x1c6f82, 0x1c6f8e),)
 # Same byte patches as main.asm / the MT1959 runtime patches, at this

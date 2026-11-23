@@ -29,6 +29,7 @@ class MediaExperiment(AdapterExperiment):
         self.failures = failures
         self.identifier = identifier
         self.read_attempts = []
+        self.layer_checks = []
         self.copies = []
 
     def code(self, cpu, address, size, data):
@@ -40,6 +41,11 @@ class MediaExperiment(AdapterExperiment):
             self.put(LENGTH, 0x1234, 4)
             self.cpu.mem_write(SENSE, b'\x03\x11\x05')
             cpu.reg_write(REGS[0], int(len(self.read_attempts) > self.failures))
+            cpu.reg_write(UC_ARM_REG_PC, cpu.reg_read(UC_ARM_REG_LR))
+        elif address == 0x1bbc1c:
+            # native layer check before the XGD layer-1 read: record its inputs, accept
+            self.layer_checks.append((self.get(START, 4), self.get(LENGTH, 4), cpu.reg_read(REGS[0])))
+            cpu.reg_write(REGS[0], 2)
             cpu.reg_write(UC_ARM_REG_PC, cpu.reg_read(UC_ARM_REG_LR))
         elif address == 0x17bac8:
             offset, sector = (cpu.reg_read(r) for r in REGS[:2])
@@ -62,7 +68,8 @@ def verify(original):
                 (1, 0, 1, 0, 0xd1, False), (1, 0, 2, 4, 0xe1, False),
                 (1, 0, 1, 5, 0xd1, False), (1, 0, 2, 0, 0xff, False),
                 (0, 0, 0, 0, 0, True)):
-            ex = MediaExperiment(overlay, failures=failures, identifier=identifier, native_toc=toc)
+            ex = MediaExperiment(overlay, failures=failures, identifier=identifier, native_toc=toc,
+                                 stubs={0xc8b20: 0})  # native DVD READ CAPACITY handler
             ex.put(0x0200072a, multi)
             ex.put(0x0200072b, ptp)
             ex.put(STRUCT + 0x5800, dmi)
@@ -73,11 +80,25 @@ def verify(original):
                 ex.put(address, value, 4)
             ex.put(0x0200071e, 0xa5)
             ex.cpu.mem_write(SENSE, b'\x06\x28\x01')
-            result = ex.run(symbols['Mt1939ReadDVDTOCHook'])
-            eligible = bool(toc and multi and not ptp and dmi in (1, 2))
+            toc_result = ex.run(symbols['Mt1939ReadDVDTOCHook'])
+            toc_return = ex.cpu.reg_read(REGS[0])
+            # recognition only marks the probe; layer 1 is read at the first DVD READ CAPACITY
+            pending = bool(toc and multi and not ptp)
+            require(not ex.read_attempts and not ex.layer_checks and not ex.copies,
+                    'XGD read during disc recognition')
+            require((ex.get(STRUCT + 0x6ffc, 4) == 0x58474450) == pending, 'XGD pending flag mismatch')
+            require(toc_result['start'] == 0x32100 and toc_result['length'] == 0x67 and
+                    ex.get(0x0200071e) == 0xa5 and toc_return == toc and toc_result['sense'] == [6, 0x28, 1],
+                    'Media hook lost native return value or read state')
+            result = ex.run(symbols['Mt1939DVDReadCapacityHook'])
+            require(ex.get(STRUCT + 0x6ffc, 4) != 0x58474450, 'XGD pending flag not cleared')
+            eligible = pending and dmi in (1, 2)
             attempts = min(failures + 1, 5) if eligible else 0
-            require(ex.read_attempts == [(0xfd0210 + 0x40 * i, 8, 16, 1)
-                                        for i in range(attempts)], 'XGD retry address/ABI mismatch')
+            # main.c passes the MT1959 raw L1 PSN with area 8; the MT1939 wrapper reads it as
+            # native area 0 with the linear address (PSN + 2 * (layer0End + 1), as C0 does)
+            linear = [(0xfd0210 + 0x40 * i + 2 * (0x200000 + 1)) & 0xffffff for i in range(attempts)]
+            require(ex.layer_checks == [(a, 16, 2) for a in linear], 'XGD native layer check mismatch')
+            require(ex.read_attempts == [(a, 0, 16, 1) for a in linear], 'XGD retry address/ABI mismatch')
             copied = eligible and failures < 5
             require(ex.copies == ([(0x6800, 14)] if copied else []), 'XGD copy boundary mismatch')
             accepted = copied and identifier in (0xd1, 0xe1)
@@ -89,10 +110,12 @@ def verify(original):
             require(bytes(ex.cpu.mem_read(STRUCT + 0x9f69, 3)) == expected_toc, 'XGD TOC size mismatch')
             require(ex.get(STRUCT + 0x5010) == (0x80 if toc and nintendo else 0),
                     'Nintendo BCA handling mismatch')
-            require(result['start'] == 0x32100 and result['length'] == 0x67 and
-                    ex.get(0x0200071e) == 0xa5 and ex.cpu.reg_read(REGS[0]) == toc,
-                    'Media hook lost native return value or read state')
+            require(result['start'] == 0x32100 and result['length'] == 0x67 and ex.get(0x0200071e) == 0xa5,
+                    'READ CAPACITY hook lost read state')
             require(result['sense'] == [6, 0x28, 1], 'XGD probe leaked sense status')
+            reads = len(ex.read_attempts)
+            ex.run(symbols['Mt1939DVDReadCapacityHook'])
+            require(len(ex.read_attempts) == reads, 'XGD probe repeated on a later READ CAPACITY')
             cases.append(dict(toc=toc, multi=multi, ptp=ptp, dmi=dmi,
                               failures=failures, identifier=identifier, accepted=accepted))
     # Unknown PFI book types (Nintendo 0xF, also 4-8, 11-13) use the DVD-ROM

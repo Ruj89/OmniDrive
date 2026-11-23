@@ -2,8 +2,11 @@
 # Purpose: Prepare and run the pinned MT1939 OmniDrive patch or original-firmware rollback trial.
 """Pinned BW-12B1LT MT1939 OmniDrive physical trial and working-drive rollback.
 
-apply: known original -> pinned full MT1939 OmniDrive candidate.
+apply: known original (or, with --force-source, a backed-up compatible
+candidate) -> pinned full MT1939 OmniDrive candidate.
 rollback: verified MT1939 OmniDrive patch -> known original.
+prepare: package from the original restore package or, with --utility, from
+payloads derived by the pinned Flash Utility encoder.
 Both use the once-only, boot-skipping finalization from restore_original.
 No arbitrary images or unknown source flash.
 """
@@ -19,9 +22,10 @@ import restore_original as restore
 import stage_update as staging
 from read_flash import SgDevice, ReadError, probe, dump as read_dump
 
-PATCH_SHA256 = 'db7979b10529b30732935dea22f12b4560f63316fc8da6fd6dac5eb3b951e413'
-PATCH_STAGED_SHA256 = 'fd78ec34cc239d5589ced7bc5a5152217340f87defccb71c29e0ea10f9843603'
-PATCH_RAW_SHA256 = 'fca70becd9db7ae28253fec388db3ba6fd834889de08d73a161348c82e92dc5f'
+# XGD candidate: watchdog db7979b1... plus EnableXGD deferred to DVD READ CAPACITY, layer-1 read via native layer check and area 0, temporary XGD trace (src/liteon/mt1939.c)
+PATCH_SHA256 = 'e96917094cd65dfc0ef632b6a5162fe9bb1ddd949b7122a5ad92ff529a00aab7'
+PATCH_STAGED_SHA256 = '7e2d226a97022515d6a7c77b3399128bb670a9f4c76213f1154a985df45a80d8'
+PATCH_RAW_SHA256 = 'fcaff19ad698864f52e7709f92e503f28b28c00ab911cdcbe78a7d136752ea83'
 sha, require = staging.sha, staging.require
 MANIFEST = {'format': 'bw12b1lt-native-trial-v1',
             'original_sha256': staging.IMAGE_SHA256, 'patched_sha256': PATCH_SHA256,
@@ -116,13 +120,48 @@ def check_baseline(directory, direction):
         require(len(raw) == staging.SIZE and sha(raw) == PATCH_RAW_SHA256, f'Patched baseline differs: {name}')
 
 
-def prepare(original_package, original_path, patched_path, baseline, output, evidence):
+def baseline_inquiry(baseline, force_source):
+    """Original-session extended INQUIRY of a verified baseline; force accepts a backed-up candidate."""
+    if force_source:
+        check_force_baseline(baseline)
+    else:
+        check_baseline(baseline, 'apply')
+    inquiry = bytearray.fromhex(json.loads((baseline / 'report.json').read_text())['extended_inquiry_hex'])
+    # a candidate session differs from the original only by the reviewed INQUIRY marker
+    if inquiry[74:86] == MARKER:
+        inquiry[74:86] = bytes(12)
+    require(sha(inquiry[:164]) == staging.INQUIRY_SHA256, 'Baseline INQUIRY differs from pinned original session')
+    return bytes(inquiry)
+
+
+def original_payloads(original_path, inquiry, utility_path):
+    """Derive the pinned original profile, staging image and window tag with the native utility encoder."""
+    from verify_loader import Utility, validate_inquiry
+    original = original_path.read_bytes()
+    require(sha(original) == staging.IMAGE_SHA256, 'Expected pinned original decoded image')
+    validate_inquiry(original, inquiry)
+    utility = Utility(utility_path.read_bytes())
+    key, iv = inquiry[148:164], inquiry[16:32]
+    profile, unused_descriptor = utility.profile(inquiry)
+    cipher, profile_tag = utility.encode(profile, key, iv)
+    window, tag = utility.encode(original[0x70000:0x80000], key, iv, window=True)
+    profile, staged = cipher + profile_tag, original[:0x70000] + window + original[0x80000:]
+    check_payloads(profile, staged, tag, 'rollback')
+    return profile, staged, tag
+
+
+def prepare(original_package, original_path, patched_path, baseline, output, evidence, *, utility=None,
+            force_source=False):
     from native_adapter import assemble
     from verify_native_port import validate_evidence
     from Crypto.Cipher import AES
     require(not output.exists(), 'Trial package directory already exists')
-    profile, original_staged, tag, unused_manifest = restore.load_package(original_package)
-    check_baseline(baseline, 'apply')
+    require(bool(original_package) != bool(utility), 'Use exactly one of --original-package and --utility')
+    inquiry = baseline_inquiry(baseline, force_source)
+    if original_package:
+        profile, original_staged, tag, unused_manifest = restore.load_package(original_package)
+    else:
+        profile, original_staged, tag = original_payloads(original_path, inquiry, utility)
     original, patched = original_path.read_bytes(), patched_path.read_bytes()
     require(sha(original) == staging.IMAGE_SHA256 and sha(patched) == PATCH_SHA256,
             'Expected exact original and MT1939 OmniDrive images')
@@ -140,7 +179,6 @@ def prepare(original_package, original_path, patched_path, baseline, output, evi
     check_payloads(profile, original_staged, tag, 'rollback')
     # Independently derive both expected read-stream hashes. This matches the
     # established reader's AES-CBC reset for every 128-byte response.
-    inquiry = bytes.fromhex(json.loads((baseline / 'report.json').read_text())['extended_inquiry_hex'])
     candidate_inquiry = bytearray(inquiry)
     candidate_inquiry[74:86] = MARKER
     require(sha(candidate_inquiry[:164]) == PATCH_INQUIRY_SHA256,
@@ -255,11 +293,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
     prep = sub.add_parser('prepare', help='Offline: build exact patch and rollback payloads')
-    for name in ('original-package', 'original', 'patched', 'baseline', 'output', 'evidence'):
+    for name in ('original', 'patched', 'baseline', 'output', 'evidence'):
         prep.add_argument('--' + name, type=Path, required=True)
+    source = prep.add_mutually_exclusive_group(required=True)
+    source.add_argument('--original-package', type=Path, help='Original restore package (restore_original.py prepare)')
+    source.add_argument('--utility', type=Path, help='Pinned Flash_Utility.exe: derive the original payloads directly')
+    prep.add_argument('--force-source', action='store_true',
+                      help='Baseline is a verified backup of a compatible installed candidate, not the original')
     inspect = sub.add_parser('inspect', help='Validate both package targets and the original baseline offline')
     inspect.add_argument('--package', type=Path, required=True)
     inspect.add_argument('--baseline', type=Path, required=True)
+    inspect.add_argument('--force-source', action='store_true',
+                         help='Baseline is a verified backup of a compatible installed candidate')
     readback = sub.add_parser('verify-readback', help='Offline: validate two full cold-start reads')
     readback.add_argument('--baseline', type=Path, required=True)
     readback.add_argument('--state', choices=('original', 'candidate'), required=True)
@@ -275,13 +320,14 @@ def main():
     args = parser.parse_args()
     try:
         if args.action == 'prepare':
-            result = prepare(args.original_package, args.original, args.patched, args.baseline, args.output, args.evidence)
+            result = prepare(args.original_package, args.original, args.patched, args.baseline, args.output,
+                             args.evidence, utility=args.utility, force_source=args.force_source)
         elif args.action == 'verify-readback':
             check_baseline(args.baseline, 'apply' if args.state == 'original' else 'rollback')
             result = {'state': args.state, 'full_image_matches_expected': True, 'flash_ready': False}
         elif args.action == 'inspect':
             result = load_package(args.package, 'apply')[3]
-            check_baseline(args.baseline, 'apply')
+            baseline_inquiry(args.baseline, args.force_source)
         else:
             result = run_trial(args.package, args.baseline, args.device, args.output, args.action,
                                force_source=getattr(args, 'force_source', False))

@@ -14,7 +14,7 @@ send an arbitrary image or CDB. Output directories must be new.
 | `stage_update.py` | RAM only | `prepare` a pinned original update package offline, `inspect` it, `stage` it into drive staging RAM. Finalization, erase, reset and unlock are excluded from its transport. | [STAGING_TEST.md](../docs/STAGING_TEST.md) |
 | `restore_original.py` | **Flash** | `prepare`/`inspect`/`run` the once-only rewrite of the pinned original firmware (boot preserved, main/profile erased). | [ORIGINAL_RESTORE_TEST.md](../docs/ORIGINAL_RESTORE_TEST.md) |
 | `inquiry94_trial.py` | **Flash** | Apply the two-byte INQUIRY-94 patch to a known original, or roll it back. Reuses `restore_original` finalization. | [INQUIRY94_FLASH_TEST.md](../docs/INQUIRY94_FLASH_TEST.md) |
-| `native_trial.py` | **Flash** | Apply the full MT1939 OmniDrive candidate, `verify-readback`, or roll back. Requires fresh evidence from `patch_verify/verify_native_port.py`. | [NATIVE_FLASH_TEST.md](../docs/NATIVE_FLASH_TEST.md) |
+| `native_trial.py` | **Flash** | Apply the full MT1939 OmniDrive candidate, `verify-readback`, or roll back. `prepare` builds the package from the original (`--original-package`, or `--utility` to derive the original payloads directly) and requires fresh evidence from `patch_verify/verify_native_port.py`; `apply`, `prepare` and `inspect` accept `--force-source` for a backed-up compatible installed candidate. | [FLASH_MT1939_IT.md](../docs/FLASH_MT1939_IT.md), [NATIVE_FLASH_TEST.md](../docs/NATIVE_FLASH_TEST.md) |
 
 Dependencies on other folders: `stage_update.py` takes hashes from
 `dump_analysis/audit_integrity.py` and `reverse_engineering/analyze_utility.py`;

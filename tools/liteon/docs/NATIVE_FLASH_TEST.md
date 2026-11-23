@@ -1,11 +1,12 @@
 # BW-12B1LT 1.03: full MT1939 OmniDrive candidate trial
 
-For the consolidated handoff ZIP, use [FLASH_MT1939_IT.md](FLASH_MT1939_IT.md).
-It supports a guarded direct update with --force-source and fresh live backups; the earlier bundles
-and historical baseline paths below are not required for that procedure.
-The current runner pins the watchdog candidate `db7979b1…`; the instructions
-below describe the older read-preparation candidate and require its archived
-runner. See [MT1939_WII_WATCHDOG_IT.md](MT1939_WII_WATCHDOG_IT.md).
+For the current candidate use [FLASH_MT1939_IT.md](FLASH_MT1939_IT.md): it
+builds the package from the original and supports a guarded direct update
+with --force-source and fresh live backups.
+The current runner pins the XGD candidate `e9691709…` (watchdog fix plus
+deferred XGD detection, see [MT1939_XGD_IT.md](MT1939_XGD_IT.md)); the
+instructions below describe the older read-preparation candidate and require
+its archived runner.
 
 This procedure is for the exact retained ASUS BW-12B1LT specimen on SATA and
 OmniDrive 1.0.4 candidate SHA-256

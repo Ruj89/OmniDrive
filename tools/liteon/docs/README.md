@@ -9,6 +9,7 @@ these files are run from the repository root.
 | --- | --- |
 | [MT1939_WII_DEBUG_RIEPILOGO_IT.md](MT1939_WII_DEBUG_RIEPILOGO_IT.md) | Italian summary of the Wii C0 failure, physical results, firmware attempts and open questions. |
 | [MT1939_WII_WATCHDOG_IT.md](MT1939_WII_WATCHDOG_IT.md) | Missing READ timestamp, exact native 03/11/05 timeout reproduction and experimental correction. |
+| [MT1939_XGD_IT.md](MT1939_XGD_IT.md) | Xbox 360 detection: layer-1 security-sector read, deferral to READ CAPACITY, physical result and RAM diagnostics. |
 | [PORTING.md](PORTING.md) | MT1939 porting study: function map, small-function emulation, integrity header. |
 | [SCSI_MAP.md](SCSI_MAP.md) | Command reception, dispatch, read parameters/FUA, data-in and sense. |
 | [INTEGRITY.md](INTEGRITY.md) | Integrity audit, selector experiments, readback comparator. |
@@ -28,3 +29,4 @@ In chronological order. Each one documents its results.
 | [INQUIRY_TEST.md](INQUIRY_TEST.md) | Offline INQUIRY-94 patch (prerequisite of the next trial) | `patch_verify/verify_inquiry_patch.py` |
 | [INQUIRY94_FLASH_TEST.md](INQUIRY94_FLASH_TEST.md) | INQUIRY-94 flash and rollback | `device/inquiry94_trial.py` |
 | [NATIVE_FLASH_TEST.md](NATIVE_FLASH_TEST.md) | Full MT1939 OmniDrive flash, readback and rollback | `device/native_trial.py` |
+| [FLASH_MT1939_IT.md](FLASH_MT1939_IT.md) | Current candidate: package from the original, direct update with `--force-source` | `device/native_trial.py` |

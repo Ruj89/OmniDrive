@@ -30,7 +30,7 @@ models in [NATIVE_ADAPTER.md](NATIVE_ADAPTER.md), not physical-media support.
 | Ordinary READ after C0 | Native raw cleanup before queued READ(10/12); original format restored; ordinary guards run; normal fast paths preserved | Host sequencing and ordinary data on real media |
 | BD raw/PSN/FUA, descrambling, EDC | Single/dual-layer PSN, mode and error hooks, lead-out patch | Real transfers; BDXL addressing (main.c treats it as single-layer) |
 | Lead-in/out | CD signed addressing, CD/DVD/BD lead-out patches | Boundary reads on real discs |
-| XGD1/2/3 | DMI/security-sector retry, geometry/TOC update, state restoration | Real security-sector acquisition |
+| XGD1/2/3 | Deferred to the first DVD READ CAPACITY; native layer check and area-0 layer-1 read; DMI/security-sector retry, geometry/TOC update, state restoration | XGD2 verified (capacity 3825924, see MT1939_XGD_IT.md); XGD1, XGD3 and non-Xbox dual layer pending |
 | Nintendo GC/Wii | Unknown PFI book types → DVD-ROM with layers; BCA flag; ordinary-read guard | Disc recognition and dumping |
 | NR/RVT-R | Control-data read failure returns success | Real discs with unreadable PFI |
 | Wii U | Empty/unknown DI classified as BD-ROM; DI geometry; ordinary-read guard | Recognition and dumping |

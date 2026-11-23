@@ -46,7 +46,8 @@ counterparts were established by reading both functions, not by the score.
 | `CDLeadOutPatchAddr0-6` | `0xe4a28`, `0x1bd770`, `0x1bd7d4`…`0x1bd8aa` | |
 | `BDIdentifierPatchAddr1-3` | `0x133926`, `0x13392d`, `0x1339d4` | "BD" signature and disc-type letter checks of the DI classifier |
 | `BDIdentifierPatchAddr4` | — | Second W/U/R/O check only exists on MT1959 (and is reached only for 'R') |
-| `ReadDVDTOCHookAddr` | `0xa24d4` → `Mt1939ReadDVDTOCHook` | XGD + Nintendo BCA, native layer state |
+| `ReadDVDTOCHookAddr` | `0xa24d4` → `Mt1939ReadDVDTOCHook` | Nintendo BCA; marks XGD pending for DVD OTP dual layer (layer 1 is not readable yet) |
+| — (`EnableXGD` call) | `0x1b500` → `Mt1939DVDReadCapacityHook` | MT1939 only: runs `EnableXGD` once at the first DVD READ CAPACITY, state and sense preserved, then `0xc8b20` |
 | `SetBDCharacteristicsHookAddr` | `0xa1e10` → `Mt1939SetBDCharacteristicsHook` | Wii U DI, native inclusive end |
 | `DVDCharacteristicsPatch` (overlay `0x01f96daa`) | `0xcbb50` → `Mt1939DVDCharacteristicsHook` | Unknown book types → DVD-ROM; see below |
 | `DVDTOCReadPatch` (overlay `0x01f976c2`) | `0xcc16a` = `0x01` | Control-data read failure returns success (NR/RVT-R) |
@@ -69,6 +70,10 @@ the layer decode and classifies dual-layer discs as single-layer (emulated:
   LBA in the spoofed packet, because native restart parsers read it again.
 - `DVDCheckLayer`: native DVD PSN mapping and layer state.
 - `ReadDiscData`: preserves `startAddress` across the native reader (XGD retry).
+  For MT1959's raw area 8 it reads like native code (`0xca4da`): linear
+  address (`dvd_psn`), `transferLength`, `MtNativeDVDCheckLayer(2)`, area 0.
+  A temporary per-attempt trace is written at disc struct `+0x6fb0`.
+- `Mt1939DVDReadCapacityHook`: deferred `EnableXGD`, see [MT1939_XGD_IT.md](MT1939_XGD_IT.md).
 - `Mt1939DispatchHook`: opcode check, 24-bit DMA count, native readiness,
   medium/type/field validation, then the shared `CmdOmniDriveReadDiscRaw`;
   restores the sector format and descrambling bits after the reader returns.
@@ -191,7 +196,7 @@ inputs and checks image regeneration, then confirms an unchanged build is idle.
 | Adapter | 1,530 unchanged dispatcher cases; 67 raw parameter cases; 480 C0 requests against a model of `main.c` (32 accepted, 448 rejected); 4 not-ready; 72 native DVD PSN cases; layer setup; DVD/BD reader prologues keep the raw format; register/stack preservation |
 | Hooks | 480 error-mode comparisons; 6 native FUA comparisons and FUA flag survival; 48 descrambling and 10 generic mode cases; 24 BD PSN; 112 DVD-R read checks; 8 BD lead-out differentials; DVD/CD boundaries |
 | Copy/recovery | 108 cases comparing native DMA/stride effects, interrupt state and filtering; 8 CD lead-out classes |
-| Media | 18 TOC/XGD fixtures; 32 PFI book types and 5 native layer classifications; 4 BD DI identification differentials; 8 control-data failure paths; 1,024 ordinary-read guards; DVD-ROM PSN |
+| Media | 18 TOC/XGD fixtures (recognition, then two READ CAPACITY: layer check, linear area-0 read, single run); 32 PFI book types and 5 native layer classifications; 4 BD DI identification differentials; 8 control-data failure paths; 1,024 ordinary-read guards; DVD-ROM PSN |
 | BD-ROM DI acquisition | 12 fixtures through native acquisition, retries, copies and geometry parser |
 | Read timer | 28 C0 cases incl. 20 idle-speed counterexamples; 12 non-reading cases; 6 IRQ tick cases |
 | Identification | Native template copy and INQUIRY responses for 7 allocation lengths |

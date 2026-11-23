@@ -122,6 +122,8 @@
 
 .org ReadDVDTOCHookAddr
     bl Mt1939ReadDVDTOCHook
+.org DVDReadCapacityHookAddr ; deferred EnableXGD
+    bl Mt1939DVDReadCapacityHook
 
 .org DVDEDCHookAddr
     bl SetErrorModeHook
