@@ -56,6 +56,7 @@ OriginalFirmware equ "../firmware/ASUS_BW-12B1LT_1.03.bin"
 .definethumblabel SetBDCharacteristics,0x0B0FE6
 .definethumblabel MtNativeReadBDData,0x0B5828
 .definethumblabel DVDReadCmd,0x0C8404
+.definethumblabel MtNativeDVDReadCapacity,0x0C8B20
 .definethumblabel MtNativeDVDPSN,0x0CB78A
 .definethumblabel MtNativeDVDCharacteristics,0x0CB7E2
 .definethumblabel ReadDVDTOC,0x0CC184
@@ -75,6 +76,7 @@ OriginalFirmware equ "../firmware/ASUS_BW-12B1LT_1.03.bin"
 .definedatalabel ReceiveReadSetupEndAddr,0x0101BE
 .definedatalabel BDReadCmdHookAddr,0x01B43C
 .definedatalabel DVDReadCmdHookAddr,0x01B47E
+.definedatalabel DVDReadCapacityHookAddr,0x01B500
 .definedatalabel DispatchHookAddr,0x01BBA4 // default arm: sense 05/20/00
 .definedatalabel DispatchReturnAddr,0x01BBBE
 .definedatalabel CopyTransferModeHookAddr,0x044484
@@ -244,6 +246,9 @@ TocOffsetValue equ 0x9F5A
 
 .org ReadDVDTOCHookAddr
     bl Mt1939ReadDVDTOCHook
+; MT1939 only: deferred EnableXGD
+.org DVDReadCapacityHookAddr
+    bl Mt1939DVDReadCapacityHook
 
 .org DVDEDCHookAddr
     bl SetErrorModeHook

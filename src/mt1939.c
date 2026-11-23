@@ -33,6 +33,7 @@ extern DWORD MtNativeReady(DWORD mode);
 extern void MtNativeReadPrepare(void);
 extern void MtNativeReadAccount(void);
 extern DWORD MtNativeDVDCharacteristics(DWORD pfi);
+extern void MtNativeDVDReadCapacity(void);
 
 static DWORD be32(const BYTE *p) {
     return ((DWORD)p[0] << 24) | ((DWORD)p[1] << 16) |
@@ -95,10 +96,37 @@ DWORD DVDCheckLayer(DWORD discType) {
     return MtNativeDVDCheckLayer(discType);
 }
 
-/* EnableXGD retries keep their requested PSN across native reader work. */
+/* EnableXGD retries keep their requested PSN across native reader work.
+ * MT1959's raw area 8 has no MT1939 equivalent. Like native reads (0xCA4DA)
+ * and C0, use a linear address and the native layer check, which selects layer
+ * 1, then area 0; the reader converts the address back to the PSN (0xCC8CE). */
 DWORD ReadDiscData(DWORD discArea, BYTE sectorCount) {
     DWORD address = startAddress;
+    DWORD check = 0;
+    BYTE xgd = discArea == 8;
+    if (xgd) {
+        startAddress = dvd_psn(address);
+        transferLength = sectorCount;
+        check = MtNativeDVDCheckLayer(2);
+        discArea = 0;
+    }
+    DWORD linear = startAddress;
+    BYTE layer = seekLayer;
     DWORD result = MtNativeReadDiscData(discArea, sectorCount);
+    /* shortcut: temporary XGD trace in the unused tail of EnableXGD's 0x6800 sector, remove once XGD reads work */
+    if (xgd) {
+        volatile DWORD *trace = (volatile DWORD *)(memoryStart + discStructOffset + 0x6fb0);
+        if (address == 0xfd0210 || trace[0] != 0x58474454)
+            trace[1] = 0;
+        DWORD n = trace[1];
+        trace[0] = 0x58474454; /* "XGDT" */
+        if (n < 5) {
+            trace[2 + 3 * n] = linear;
+            trace[3 + 3 * n] = (check & 0xff) << 24 | layer << 16 | (result & 0xffff);
+            trace[4 + 3 * n] = MtSense[0] << 16 | MtSense[1] << 8 | MtSense[2];
+            trace[1] = n + 1;
+        }
+    }
     startAddress = address;
     return result;
 }
@@ -201,16 +229,35 @@ DWORD Mt1939DVDCharacteristicsHook(DWORD pfi) {
     return MtNativeDVDCharacteristics(pfi);
 }
 
+/* Pending XGD probe flag in the unused tail of EnableXGD's 0x6800 sector,
+ * after the temporary trace; rewritten on every DVD recognition. */
+#define XGD_PENDING 0x58474450 /* "XGDP" */
+static volatile DWORD *xgd_pending(void) {
+    return (volatile DWORD *)(memoryStart + discStructOffset + 0x6ffc);
+}
+
+/* MT1939 cannot read layer 1 yet during recognition (native DVD read setup
+ * runs after this hook, 0xA25C2), so EnableXGD is deferred to READ CAPACITY. */
 DWORD Mt1939ReadDVDTOCHook(DWORD unk) {
     DWORD result = ReadDVDTOC(unk);
     if (result) {
-        DWORD savedStart = startAddress, savedLength = transferLength;
-        BYTE savedLayer = seekLayer;
-        BYTE sense0 = MtSense[0], sense1 = MtSense[1], sense2 = MtSense[2];
-        if (MtDVDLayers && !MtDVDPTP) EnableXGD();
+        *xgd_pending() = MtDVDLayers && !MtDVDPTP ? XGD_PENDING : 0;
         // If Nintendo Disc, enable BCA
         if ((ReadDiscStructMemDWORD(0x5000) >> 24) == 0xff)
             WriteDiscStructMemByte(0x5010, 0x80);
+    }
+    return result;
+}
+
+/* DVD READ CAPACITY: run the deferred EnableXGD once, before the native
+ * handler reports lastSector. Request state and sense are preserved. */
+void Mt1939DVDReadCapacityHook(void) {
+    if (*xgd_pending() == XGD_PENDING) {
+        *xgd_pending() = 0;
+        DWORD savedStart = startAddress, savedLength = transferLength;
+        BYTE savedLayer = seekLayer;
+        BYTE sense0 = MtSense[0], sense1 = MtSense[1], sense2 = MtSense[2];
+        EnableXGD();
         startAddress = savedStart;
         transferLength = savedLength;
         seekLayer = savedLayer;
@@ -218,7 +265,7 @@ DWORD Mt1939ReadDVDTOCHook(DWORD unk) {
         MtSense[1] = sense1;
         MtSense[2] = sense2;
     }
-    return result;
+    MtNativeDVDReadCapacity();
 }
 
 /* Empty Wii U DI: the native parser treats the end PSN as inclusive. */
